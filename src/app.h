@@ -242,6 +242,7 @@ typedef struct {
     int ime_sel;           /* 候选序号（0 起） */
     int hist_sel;          /* 历史列选中项（0 起） */
     int ime_off;           /* 候选横向滚动窗口起点 */
+    int chip_off;          /* 上排（联想/推荐）滚动窗口起点 */
     char assoc[APP_CHIP_MAX][APP_CHIP_LEN];  /* 上屏后的本地词库联想 */
     int assoc_n;
 

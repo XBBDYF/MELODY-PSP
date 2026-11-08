@@ -195,16 +195,22 @@ local function xmbSearch(t,m)
   local cands=m.ime_candidates or{};local hist=m.search_history or{};local recs=m.search_chips or{};local assoc=m.assoc or{}
   local ime=(m.ime_active or 0)==1
   local top=assoc;local topLabel="联想"
-  if #top==0 then local sgs=m.suggestions or{};if (not ime)and#sgs>0 then top={};for i=1,math.min(#sgs,3)do top[i]=sgs[i]end;topLabel="联想" elseif (not ime)then top=recs;topLabel="推荐" end end
-  if #top>0 then text(17,102,26,topLabel,0,C.dim);for i=1,math.min(#top,3)do local x=45+(i-1)*100;local sel=m.chip_row==1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,96,20,C.accent)end;text(x+4,102,90,top[i],0,sel and C.bg or C.fg)end end
+  if #top==0 then local sgs=m.suggestions or{};if (not ime)and#sgs>0 then top={};for i=1,math.min(#sgs,6)do top[i]=sgs[i]end;topLabel="联想" elseif (not ime)then top=recs;topLabel="推荐" end end
+  local toff=m.chip_off or 0;if toff>#top-1 then toff=math.max(0,#top-3)end
+  if #top>0 then
+   text(17,102,26,topLabel,0,C.dim)
+   if toff>0 then text(45,102,8,"<",0,C.accent)end
+   for i=1,3 do local idx=toff+i;if top[idx]then local x=56+(i-1)*96;local sel=m.chip_row==1 and (m.chip_selected or 1)==idx;if sel then ui.rect(x,99,92,20,C.accent)end;text(x+4,102,86,top[idx],0,sel and C.bg or C.fg)end end
+   if toff+3<#top then text(344,102,8,">",0,C.accent)end
+  end
   if ime and #cands>0 then
    local off=m.ime_off or 0;text(17,122,26,"候选",0,C.dim)
-   if off>0 then text(45,122,10,"‹",0,C.accent)end
-   for i=0,3 do local idx=off+i+1;if cands[idx]then local x=57+i*68;local sel=m.chip_row==2 and (m.ime_selected or 1)==idx;if sel then ui.rect(x,119,64,20,C.accent)end;text(x+3,122,58,cands[idx],0,sel and C.bg or C.fg)end end
-   if off+4<#cands then text(329,122,10,"›",0,C.accent)end
+   if off>0 then text(45,122,8,"<",0,C.accent)end
+   for i=0,3 do local idx=off+i+1;local v=cands[idx];if v and v~=""then local x=56+i*68;local sel=m.chip_row==2 and (m.ime_selected or 1)==idx;if sel then ui.rect(x,119,64,20,C.accent)end;text(x+3,122,58,v,0,sel and C.bg or C.fg)end end
+   if off+4<#cands then text(330,122,8,">",0,C.accent)end
   end
-  text(356,99,110,"历史",0,C.dim)
-  for i=1,math.min(#hist,3)do local y=112+(i-1)*15;local sel=m.chip_row==3 and (m.hist_selected or 1)==i;if sel then ui.rect(353,y-1,116,14,C.accent)end;text(357,y,110,hist[i],0,sel and C.bg or C.dim)end
+  text(356,101,110,"历史",0,C.dim)
+  for i=1,math.min(#hist,2)do local y=115+(i-1)*16;local sel=m.chip_row==3 and (m.hist_selected or 1)==i;if sel then ui.rect(353,y-1,116,15,C.accent)end;text(357,y,110,hist[i],0,sel and C.bg or C.dim)end
   local letters={"qwertyuiop","asdfghjkl","zxcvbnm"}
   for r=0,2 do for col=0,(r<2 and 9 or 8)do
    local label=col<#letters[r+1]and string.sub(letters[r+1],col+1,col+1)or r==1 and"←"or col==7 and"空格"or"搜索"

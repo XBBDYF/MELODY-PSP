@@ -80,7 +80,11 @@ def parse_pinyin_data(path, font_cps):
         if not syl or not re.fullmatch(r"[a-z]+", syl):
             continue
         ch = chr(cp)
-        groups.setdefault(syl, []).append(ch)
+        if ch.isspace() or ch in '\u3000\u00a0':   # 空白/全角空格不要进候选
+            continue
+        lst = groups.setdefault(syl, [])
+        if ch not in lst:
+            lst.append(ch)
     rank = {}
     for i, ch in enumerate(FREQ_ORDER):
         rank.setdefault(ch, i)      # 重复字保留第一次出现（更靠前）

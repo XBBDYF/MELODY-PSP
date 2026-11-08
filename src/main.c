@@ -1944,17 +1944,20 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
         return;
     }
     if (pressed & PSP_CTRL_TRIANGLE) {
-        /* △ = 联想：先把输入法里拼好的字母上屏，再请求联想；删字交给键盘的 ← 键 */
-        if (ime_active()) {
-            char raw[64];
+        /* △：有字库候选就跳到候选行，没有候选就跳到联想行；删字用 ← */
+        int bot_n = ime_active() ? ime_candidate_count() : 0;
+        int sug_n = api_suggest_count();
+        int top_n = g_app.assoc_n > 0 ? g_app.assoc_n
+                  : (sug_n > 0 ? sug_n : (ime_active() ? 0 : g_app.chips_n));
 
-            if (ime_commit_raw(raw, (int)sizeof(raw)) > 0) query_append(raw);
-        }
-        search_after_commit();
-        g_app.chip_sel = 0;
-        if (g_app.query[0]) {
+        if (bot_n > 0) {
+            g_app.kb_row = -2;
+            g_app.ime_sel = 0;
+            g_app.ime_off = 0;
+        } else if (top_n > 0) {
             g_app.kb_row = -1;
-            ui_toast("联想中…");
+            g_app.chip_sel = 0;
+            g_app.chip_off = 0;
         }
         return;
     }
@@ -1991,15 +1994,26 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
 
         if (row <= -1) {
             if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT)) {
-                if (row == -1 && g_app.chip_sel > 0) g_app.chip_sel--;
-                else if (row == -2 && g_app.ime_sel > 0) {
+                if (row == -3) {
+                    g_app.kb_row = top_n > 0 ? -1 : (bot_n > 0 ? -2 : 0);
+                } else if (row == -1 && g_app.chip_sel > 0) {
+                    g_app.chip_sel--;
+                    if (g_app.chip_sel < g_app.chip_off) g_app.chip_off = g_app.chip_sel;
+                } else if (row == -2 && g_app.ime_sel > 0) {
                     g_app.ime_sel--;
                     if (g_app.ime_sel < g_app.ime_off) g_app.ime_off = g_app.ime_sel;
                 }
             }
             if (btn_repeat(pressed, held, dt, PSP_CTRL_RIGHT)) {
-                if (row == -1 && g_app.chip_sel + 1 < top_n) g_app.chip_sel++;
-                else if (row == -2 && g_app.ime_sel + 1 < bot_n) {
+                if (row == -1) {
+                    if (g_app.chip_sel + 1 < top_n) {
+                        g_app.chip_sel++;
+                        if (g_app.chip_sel >= g_app.chip_off + 3) g_app.chip_off = g_app.chip_sel - 2;
+                    } else if (hist_n > 0) {
+                        g_app.kb_row = -3;      /* 上排最右再右移 → 右侧历史列 */
+                        g_app.hist_sel = 0;
+                    }
+                } else if (row == -2 && g_app.ime_sel + 1 < bot_n) {
                     g_app.ime_sel++;
                     if (g_app.ime_sel >= g_app.ime_off + 4) g_app.ime_off = g_app.ime_sel - 3;
                 }

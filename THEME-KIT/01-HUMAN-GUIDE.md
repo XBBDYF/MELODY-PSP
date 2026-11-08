@@ -222,3 +222,14 @@ python -B TOOLS/validate_skin_runtime.py skins/my_theme    # 结构 + Lua 运行
 python -B TOOLS/validate_skin_fonts.py   skins/my_theme    # 字体（有 fonts[] 时）
 python -B TOOLS/make_theme_font.py font.ttf --size 22 --chars "文本" -o skins/my_theme/fonts/x.bin
 ```
+
+## 12. 轻量 / 省电主题
+
+- **深色不等于省电**：PSP 是 LCD，背光常亮，黑色像素照样耗电；省电来自「每帧少干活」；
+- 少画：整屏底色用 1 个 `ui.rect` 替代渐变/多层叠加；每页文字控制在几行；
+- 不逐帧动画：`t` 不参与绘制；不做每帧变化的效果；
+- 不带资源：不引用图片/字体/音效，少一次存储读取；
+- 需要滚动/动画的页面交给原生（不写该页面即可回落）；
+- 参考 `EXAMPLES/eco/`。
+
+> 主题能影响的只有「绘制量」；时钟、背光、Wi-Fi、音频解码都不在主题 API 里。

@@ -16,6 +16,7 @@
 | 只换配色 / 背景 / 强调色 | **一个 `skin.json`**，不用 Lua | [01-HUMAN-GUIDE.md](01-HUMAN-GUIDE.md) §3 |
 | 自定义页面排版（磁贴、横排、纸感…） | `skin.json` + `skin.lua` | [01-HUMAN-GUIDE.md](01-HUMAN-GUIDE.md) §4 |
 | 让 AI 帮你做/改主题 | 把 [AI-PROMPT.txt](AI-PROMPT.txt) 贴给 AI，并让它读 [02-AI-GUIDE.md](02-AI-GUIDE.md) | [02-AI-GUIDE.md](02-AI-GUIDE.md) |
+| 想做"省电/轻量"主题 | 少填充、不逐帧动画、不带图；**深色不等于省电**（LCD 背光常亮） | [01-HUMAN-GUIDE.md](01-HUMAN-GUIDE.md) §12 |
 
 ---
 
@@ -71,7 +72,7 @@ skins/
 | [06-CHECKLIST.md](06-CHECKLIST.md) | 发布前逐项检查 |
 | [07-EXAMPLES.md](07-EXAMPLES.md) | 9 套官方皮肤分别该怎么读、抄哪一段 |
 | [TEMPLATES/](TEMPLATES/) | 空主题骨架（配色版 / 脚本版 / widget 版） |
-| [EXAMPLES/](EXAMPLES/) | 两份可直接运行的示例（paper 脚本版、ocean 配色版）+ 搜索页说明 |
+| [EXAMPLES/](EXAMPLES/) | 可直接运行的示例：paper（脚本版）、ocean（配色版）、**eco（省电原型）** + 搜索页说明 |
 | [TOOLS/](TOOLS/) | 三个离线校验/生成脚本（Python 3，无需编译） |
 
 ---

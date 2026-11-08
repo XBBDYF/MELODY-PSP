@@ -20,7 +20,7 @@ enum {
     IME_ASCII = 3        /* 英文直输：字母直接进搜索框，不产生 preedit */
 };
 
-#define IME_MAX_CAND   8
+#define IME_MAX_CAND   32   /* 候选一屏放不下，界面做横向滚动窗口 */
 #define IME_PRE_MAX    48
 #define IME_WORD_MAX   24
 
@@ -48,5 +48,8 @@ int  ime_select(int i, char *out, int cap);
 
 /* 把当前 preedit 原样上屏（假名/英文场景的兜底） */
 int  ime_commit_raw(char *out, int cap);
+
+/* 本地词库联想：以 text（UTF-8）开头的词条，最多 max 条（用于「上屏后立即联想」） */
+int  ime_assoc(const char *text, char out[][IME_WORD_MAX], int max);
 
 #endif /* MELODY_IME_H */

@@ -264,18 +264,16 @@ end
 local function search(t,m)
  header("搜索",nil,m);ui.rect(17,63,444,30,"#FFFFFF");icon("search",26,70,16,"#151515");local pre=(m.ime_active or 0)==1 and(m.ime_pre or"")or"";if(m.query or"")~=""then text(51,70,330,m.query,0,"#333333")elseif pre==""then text(51,70,330,"歌曲、歌手、歌单",0,"#333333")end;if pre~=""then local qw=ui.text_width(m.query or"",1);text(51+math.min(qw,300),70,300,pre,0,C.accent)end;if m.search_edit==1 then text(400,70,56,(m.ime_mode or 1)==2 and"假名"or((m.ime_mode or 1)==3 and"英文"or"拼音"),0,C.accent)end
  if m.search_edit==1 then
-  local cands=m.ime_candidates or{};local hist=m.search_history or{};local recs=m.search_chips or{}
+  local cands=m.ime_candidates or{};local hist=m.search_history or{};local recs=m.search_chips or{};local assoc=m.assoc or{}
   local ime=(m.ime_active or 0)==1
-  if ime then
-   text(17,102,26,"候选",0,C.dim)
-   for i=1,math.min(#cands,4)do local x=45+(i-1)*70;local sel=m.chip_row==1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,66,20,C.accent)end;text(x+3,102,61,i.."."..cands[i],0,sel and C.bg or C.fg)end
-  else
-   text(17,102,28,"推荐",0,C.dim)
-   for i=1,math.min(#recs,4)do local x=47+(i-1)*74;local sel=m.chip_row==1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,70,20,C.accent)end;text(x+4,102,64,recs[i],0,sel and C.bg or C.fg)end
-  end
-  if (not ime)and#(m.suggestions or{})>0 then
-   local sgs=m.suggestions or{};local first=math.max(1,math.min(#sgs-2,(m.suggest_selected or 1)));text(17,122,28,"联想",0,C.dim)
-   for slot=0,2 do local i=first+slot;if sgs[i]then local x=47+slot*96;local sel=m.suggest_focused==1 and m.suggest_selected==i;if sel then ui.rect(x,119,92,20,C.accent)end;text(x+4,122,86,sgs[i],0,sel and C.bg or C.fg)end end
+  local top=assoc;local topLabel="联想"
+  if #top==0 then local sgs=m.suggestions or{};if (not ime)and#sgs>0 then top={};for i=1,math.min(#sgs,3)do top[i]=sgs[i]end;topLabel="联想" elseif (not ime)then top=recs;topLabel="推荐" end end
+  if #top>0 then text(17,102,26,topLabel,0,C.dim);for i=1,math.min(#top,3)do local x=45+(i-1)*100;local sel=m.chip_row==1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,96,20,C.accent)end;text(x+4,102,90,top[i],0,sel and C.bg or C.fg)end end
+  if ime and #cands>0 then
+   local off=m.ime_off or 0;text(17,122,26,"候选",0,C.dim)
+   if off>0 then text(45,122,10,"‹",0,C.accent)end
+   for i=0,3 do local idx=off+i+1;if cands[idx]then local x=57+i*68;local sel=m.chip_row==2 and (m.ime_selected or 1)==idx;if sel then ui.rect(x,119,64,20,C.accent)end;text(x+3,122,58,cands[idx],0,sel and C.bg or C.fg)end end
+   if off+4<#cands then text(329,122,10,"›",0,C.accent)end
   end
   text(356,99,110,"历史",0,C.dim)
   for i=1,math.min(#hist,3)do local y=112+(i-1)*15;local sel=m.chip_row==3 and (m.hist_selected or 1)==i;if sel then ui.rect(353,y-1,116,14,C.accent)end;text(357,y,110,hist[i],0,sel and C.bg or C.dim)end

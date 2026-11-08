@@ -1831,6 +1831,19 @@ static void query_backspace(void)
 }
 
 /* 字母进输入法：ASCII 模式直接写搜索框，拼音/假名先进 preedit */
+/* 上屏后立即刷新联想：本地词库补全 + 在线联想（提示词也算） */
+static void search_after_commit(void)
+{
+    g_app.assoc_n = ime_assoc(g_app.query, g_app.assoc, APP_CHIP_MAX);
+    g_app.chip_sel = 0;
+    if (g_app.query[0]) {
+        snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
+        g_app.sug_state = 1;
+        g_app.sug_sel = 0;
+        api_request_suggest(g_app.query);
+    }
+}
+
 static void search_type_char(char ch)
 {
     static char last_pre[24];
@@ -1936,19 +1949,12 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
             char raw[64];
 
             if (ime_commit_raw(raw, (int)sizeof(raw)) > 0) query_append(raw);
-            snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
-            if (g_app.query[0]) {
-                g_app.sug_state = 1;
-                g_app.sug_sel = 0;
-                api_request_suggest(g_app.query);
-                g_app.sug_focus = 1;
-                ui_toast("联想中…");
-            }
-            return;
         }
-        if (api_suggest_count() > 0) {
-            g_app.sug_focus = 1;
-            if (g_app.sug_sel >= api_suggest_count()) g_app.sug_sel = 0;
+        search_after_commit();
+        g_app.chip_sel = 0;
+        if (g_app.query[0]) {
+            g_app.kb_row = -1;
+            ui_toast("联想中…");
         }
         return;
     }
@@ -1969,116 +1975,88 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
         }
     }
 
-    /* 联想面板焦点（沿用旧逻辑） */
-    if (g_app.sug_focus) {
-        int n = api_suggest_count();
-
-        if ((pressed & PSP_CTRL_CROSS) || (pressed & PSP_CTRL_TRIANGLE)) {
-            g_app.sug_focus = 0;
-            return;
-        }
-        if (n > 0) {
-            int sn = n;
-
-            if (g_app.sug_sel >= sn) g_app.sug_sel = 0;
-            if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT))
-                g_app.sug_sel = (g_app.sug_sel + sn - 1) % sn;
-            if (btn_repeat(pressed, held, dt, PSP_CTRL_RIGHT))
-                g_app.sug_sel = (g_app.sug_sel + 1) % sn;
-            if (btn_repeat(pressed, held, dt, PSP_CTRL_UP) ||
-                btn_repeat(pressed, held, dt, PSP_CTRL_DOWN))
-                g_app.sug_focus = 0;
-            if (pressed & PSP_CTRL_CIRCLE) {
-                snprintf(g_app.query, sizeof(g_app.query), "%s", api_suggest(g_app.sug_sel));
-                g_app.query_len = (int)strlen(g_app.query);
-                snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
-                g_app.sug_focus = 0;
-                mlog("suggest pick: %s", g_app.query);
-                search_do(g_app.query);
-            }
-        }
-        return;
-    }
-
-    /* 焦点行：-1 = 左列第一行（候选/推荐），-2 = 左列第二行（联想），-3 = 右列历史 */
-    if (g_app.kb_row <= -1) {
+    /* 焦点行：-1 = 上排（联想/推荐），-2 = 下排（候选），-3 = 右列历史；空行跳过 */
+    {
         int ime = ime_active();
-        int cand_n = ime ? ime_candidate_count() : 0;
+        int bot_n = ime ? ime_candidate_count() : 0;
         int sug_n = api_suggest_count();
+        int top_n = g_app.assoc_n > 0 ? g_app.assoc_n
+                  : (sug_n > 0 ? sug_n : (ime ? 0 : g_app.chips_n));
         int hist_n = search_hist_count();
         int row = g_app.kb_row;
 
-        if (row == -1 && !ime && g_app.chip_sel >= g_app.chips_n && g_app.chips_n > 0)
-            g_app.chip_sel = g_app.chips_n - 1;
-        if (row == -1 && ime && g_app.ime_sel >= cand_n) g_app.ime_sel = cand_n ? cand_n - 1 : 0;
-        if (row == -2 && g_app.sug_sel >= sug_n) g_app.sug_sel = sug_n ? sug_n - 1 : 0;
-        if (row == -3 && g_app.hist_sel >= hist_n) g_app.hist_sel = hist_n ? hist_n - 1 : 0;
+        if (g_app.chip_sel >= top_n) g_app.chip_sel = top_n ? top_n - 1 : 0;
+        if (g_app.ime_sel >= bot_n) g_app.ime_sel = bot_n ? bot_n - 1 : 0;
+        if (g_app.hist_sel >= hist_n) g_app.hist_sel = hist_n ? hist_n - 1 : 0;
 
-        if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT)) {
-            if (row == -1 && ime) {
-                if (g_app.ime_sel > 0) g_app.ime_sel--;
-            } else if (row == -1) {
-                if (g_app.chip_sel > 0) g_app.chip_sel--;
-            } else if (row == -2) {
-                if (g_app.sug_sel > 0) g_app.sug_sel--;
+        if (row <= -1) {
+            if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT)) {
+                if (row == -1 && g_app.chip_sel > 0) g_app.chip_sel--;
+                else if (row == -2 && g_app.ime_sel > 0) {
+                    g_app.ime_sel--;
+                    if (g_app.ime_sel < g_app.ime_off) g_app.ime_off = g_app.ime_sel;
+                }
             }
-        }
-        if (btn_repeat(pressed, held, dt, PSP_CTRL_RIGHT)) {
-            if (row == -1 && ime) {
-                if (g_app.ime_sel + 1 < cand_n) g_app.ime_sel++;
-            } else if (row == -1) {
-                if (g_app.chip_sel + 1 < g_app.chips_n) g_app.chip_sel++;
-            } else if (row == -2) {
-                if (g_app.sug_sel + 1 < sug_n) g_app.sug_sel++;
+            if (btn_repeat(pressed, held, dt, PSP_CTRL_RIGHT)) {
+                if (row == -1 && g_app.chip_sel + 1 < top_n) g_app.chip_sel++;
+                else if (row == -2 && g_app.ime_sel + 1 < bot_n) {
+                    g_app.ime_sel++;
+                    if (g_app.ime_sel >= g_app.ime_off + 4) g_app.ime_off = g_app.ime_sel - 3;
+                }
             }
-        }
-        if (btn_repeat(pressed, held, dt, PSP_CTRL_UP)) {
-            if (row == -1) g_app.kb_row = hist_n > 0 ? -3 : (sug_n > 0 ? -2 : -1);
-            else if (row == -2) g_app.kb_row = -1;
-            else if (hist_n > 0 && g_app.hist_sel > 0) g_app.hist_sel--;
-        }
-        if (btn_repeat(pressed, held, dt, PSP_CTRL_DOWN)) {
-            if (row == -3) {
-                if (g_app.hist_sel + 1 < hist_n) g_app.hist_sel++;
-                else g_app.kb_row = -1;
-            } else if (row == -2) {
-                g_app.kb_row = 0;
-                if (g_app.kb_col > 9) g_app.kb_col = 9;
-            } else {
-                g_app.kb_row = sug_n > 0 ? -2 : 0;
-                if (g_app.kb_row == 0 && g_app.kb_col > 9) g_app.kb_col = 9;
+            if (btn_repeat(pressed, held, dt, PSP_CTRL_UP)) {
+                if (row == -3) {
+                    if (g_app.hist_sel > 0) g_app.hist_sel--;
+                } else if (row == -2) {
+                    if (top_n > 0) g_app.kb_row = -1;
+                    else if (hist_n > 0) g_app.kb_row = -3;
+                } else if (hist_n > 0) {
+                    g_app.kb_row = -3;
+                }
             }
-        }
-        if (pressed & PSP_CTRL_CIRCLE) {
-            if (row == -3) {
-                const char *q = search_hist_at(g_app.hist_sel);
+            if (btn_repeat(pressed, held, dt, PSP_CTRL_DOWN)) {
+                if (row == -3) {
+                    if (g_app.hist_sel + 1 < hist_n) g_app.hist_sel++;
+                    else g_app.kb_row = top_n > 0 ? -1 : (bot_n > 0 ? -2 : 0);
+                } else if (row == -1) {
+                    if (bot_n > 0) g_app.kb_row = -2;
+                    else { g_app.kb_row = 0; if (g_app.kb_col > 9) g_app.kb_col = 9; }
+                } else {
+                    g_app.kb_row = 0;
+                    if (g_app.kb_col > 9) g_app.kb_col = 9;
+                }
+            }
+            if (pressed & PSP_CTRL_CIRCLE) {
+                if (row == -3) {
+                    const char *q = search_hist_at(g_app.hist_sel);
 
-                if (q[0]) {
-                    snprintf(g_app.query, sizeof(g_app.query), "%s", q);
+                    if (q[0]) {
+                        snprintf(g_app.query, sizeof(g_app.query), "%s", q);
+                        g_app.query_len = (int)strlen(g_app.query);
+                        search_do(g_app.query);
+                        search_after_commit();
+                    }
+                } else if (row == -1 && top_n > 0) {
+                    const char *txt = g_app.assoc_n > 0 ? g_app.assoc[g_app.chip_sel]
+                                    : (sug_n > 0 ? api_suggest(g_app.chip_sel)
+                                                 : g_app.chips[g_app.chip_sel]);
+
+                    snprintf(g_app.query, sizeof(g_app.query), "%s", txt);
                     g_app.query_len = (int)strlen(g_app.query);
                     search_do(g_app.query);
-                }
-            } else if (row == -2) {
-                if (sug_n > 0) {
-                    snprintf(g_app.query, sizeof(g_app.query), "%s", api_suggest(g_app.sug_sel));
-                    g_app.query_len = (int)strlen(g_app.query);
-                    search_do(g_app.query);
-                }
-            } else if (ime) {
-                char out[64];
+                    search_after_commit();
+                } else if (row == -2) {
+                    char out[64];
 
-                if (ime_select(g_app.ime_sel, out, (int)sizeof(out)) > 0) {
-                    query_append(out);
-                    g_app.ime_sel = 0;
-                    mlog("ime commit: %s", out);
+                    if (ime_select(g_app.ime_sel, out, (int)sizeof(out)) > 0) {
+                        query_append(out);
+                        mlog("ime commit: %s", out);
+                        search_after_commit();
+                    }
                 }
-            } else if (g_app.chips_n > 0) {
-                snprintf(g_app.query, sizeof(g_app.query), "%s", g_app.chips[g_app.chip_sel]);
-                g_app.query_len = (int)strlen(g_app.query);
-                search_do(g_app.query);
             }
+            return;
         }
-        return;
     }
 
     /* 键盘：字母先给输入法 */
@@ -2091,12 +2069,15 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
         if (g_app.kb_col >= kb_cols(g_app.kb_row)) g_app.kb_col = 0;
     }
     if (btn_repeat(pressed, held, dt, PSP_CTRL_UP)) {
-        int top = g_app.chips_n > 0 ? -2 : -1;
+        int bot_n = ime_active() ? ime_candidate_count() : 0;
+        int sug_n = api_suggest_count();
+        int top_n = g_app.assoc_n > 0 ? g_app.assoc_n
+                  : (sug_n > 0 ? sug_n : (ime_active() ? 0 : g_app.chips_n));
+        int target = bot_n > 0 ? -2 : (top_n > 0 ? -1 : (search_hist_count() > 0 ? -3 : 0));
 
-        if (g_app.kb_row <= 0) g_app.kb_row = top;
+        if (g_app.kb_row <= 0) g_app.kb_row = target;
         else g_app.kb_row--;
-        if (g_app.kb_col >= (g_app.kb_row <= -1 ? 9 : kb_cols(g_app.kb_row)))
-            g_app.kb_col = (g_app.kb_row <= -1 ? 9 : kb_cols(g_app.kb_row)) - 1;
+        if (g_app.kb_col >= 9) g_app.kb_col = 9;
     }
     if (btn_repeat(pressed, held, dt, PSP_CTRL_DOWN)) {
         g_app.kb_row++;

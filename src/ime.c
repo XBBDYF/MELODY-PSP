@@ -338,10 +338,10 @@ static void rebuild_candidates(void)
 
     if (g_mode == IME_PINYIN) {
         if (!g_pre[0]) return;
-        /* 顺序：整词完全匹配 → 同音节单字 → 词首字 → 前缀词 */
+        /* 顺序：整词完全匹配 → 同音节单字（多给几个，可横向滚动）→ 词首字 → 前缀词 */
         collect(k_ime_pinyin, k_ime_pinyin_count, g_pre, 1);
-        if (g_cand_n < 5) char_candidates(g_pre, 1, 5 - g_cand_n);
-        if (g_cand_n < 5) word_initial_candidates(g_pre, 5 - g_cand_n);
+        if (g_cand_n < 4) char_candidates(g_pre, 1, 16);
+        if (g_cand_n < 20) word_initial_candidates(g_pre, 6);
         collect(k_ime_pinyin, k_ime_pinyin_count, g_pre, 0);
         return;
     }
@@ -504,4 +504,25 @@ int ime_select(int i, char *out, int cap)
     snprintf(g_last, sizeof(g_last), "%s", g_cand[i]);
     ime_reset();
     return (int)strlen(out);
+}
+
+int ime_assoc(const char *text, char out[][IME_WORD_MAX], int max)
+{
+    int n = 0;
+    int tl;
+
+    if (!text || !text[0] || !out || max <= 0) return 0;
+    tl = (int)strlen(text);
+
+    for (int i = 0; i < k_ime_pinyin_count && n < max; ++i) {
+        if (!strncmp(k_ime_pinyin[i].word, text, (size_t)tl) &&
+            strcmp(k_ime_pinyin[i].word, text))
+            snprintf(out[n++], IME_WORD_MAX, "%s", k_ime_pinyin[i].word);
+    }
+    for (int i = 0; i < k_ime_kana_count && n < max; ++i) {
+        if (!strncmp(k_ime_kana[i].word, text, (size_t)tl) &&
+            strcmp(k_ime_kana[i].word, text))
+            snprintf(out[n++], IME_WORD_MAX, "%s", k_ime_kana[i].word);
+    }
+    return n;
 }

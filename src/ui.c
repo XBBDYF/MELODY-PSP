@@ -1976,59 +1976,49 @@ static void screen_search(float t, float dt)
         int ime = ime_active();
         int ime_n = ime ? ime_candidate_count() : 0;
         int sug_n = api_suggest_count();
-        int left_x = 15, left_w = 330;      /* 左列：候选 / 推荐 / 联想 */
-        int right_x = 352, right_w = 116;   /* 右列：搜索历史 */
+        int top_n = g_app.assoc_n > 0 ? g_app.assoc_n
+                  : (sug_n > 0 ? sug_n : (ime ? 0 : g_app.chips_n));
+        int left_x = 15, right_x = 352, right_w = 116;
 
-        /* 左列第一行：输入法候选优先，否则推荐搜索 */
-        if (ime_n > 0) {
-            int n = ime_n > 4 ? 4 : ime_n;
-            int cw = 66;
+        /* 上排：联想（上屏后 / 在线联想）或推荐；下排：输入法候选（可左右滚动） */
+        if (top_n > 0) {
+            const char *label = g_app.assoc_n > 0 ? "联想" : (sug_n > 0 ? "联想" : "推荐");
 
-            gfx_text(FS_SM, left_x, 73, "候选", C_MUTE);
-
-            for (int i = 0; i < n; ++i) {
-                char tag[40];
-                int x = left_x + 26 + i * (cw + 4), y = 68;
-                int sel = (g_app.kb_row == -1 && g_app.ime_sel == i);
-
-                snprintf(tag, sizeof(tag), "%d.%s", i + 1, ime_candidate(i));
-                gfx_fill_round(x, y, cw, 20, 10, sel ? C_ACC : C_PANEL2);
-                if (!sel) gfx_round_border_a(x, y, cw, 20, 10, C_LINE, 160);
-                gfx_text_ellipsis(FS_SM, x + 5, y + 4, cw - 8, tag, sel ? C_WHITE : C_TXT);
-            }
-        } else if (g_app.chips_n > 0) {
-            int n = g_app.chips_n > 4 ? 4 : g_app.chips_n;
-            int cw = 78;
-
-            gfx_text(FS_SM, left_x, 73, "推荐", C_MUTE);
-            for (int i = 0; i < n; ++i) {
-                int x = left_x + 30 + i * (cw + 4), y = 68;
+            gfx_text(FS_SM, left_x, 73, label, C_MUTE);
+            for (int i = 0; i < top_n && i < 3; ++i) {
+                const char *txt = g_app.assoc_n > 0 ? g_app.assoc[i]
+                                : (sug_n > 0 ? api_suggest(i) : g_app.chips[i]);
+                int x = left_x + 30 + i * 100, y = 68, w = 96;
                 int sel = (g_app.kb_row == -1 && g_app.chip_sel == i);
 
-                gfx_fill_round(x, y, cw, 20, 10, sel ? C_ACC : C_PANEL2);
-                if (!sel) gfx_round_border_a(x, y, cw, 20, 10, C_LINE, 160);
-                gfx_text_ellipsis(FS_SM, x + 6, y + 4, cw - 10, g_app.chips[i],
-                                  sel ? C_WHITE : C_SUB);
-            }
-        }
-
-        /* 左列第二行：联想（有的话）；没有就留空，避免和推荐抢焦点 */
-        if (sug_n > 0 && !ime) {
-            int n = sug_n > 3 ? 3 : sug_n;
-
-            gfx_text(FS_SM, left_x, 99, "联想", C_MUTE);
-            for (int i = 0; i < n; ++i) {
-                int x = left_x + 30 + i * 100, y = 94, w = 96;
-                int sel = (g_app.sug_focus && g_app.sug_sel == i);
-
                 gfx_fill_round(x, y, w, 20, 10, sel ? C_ACC : C_PANEL2);
-                if (!sel) gfx_round_border_a(x, y, w, 20, 10, C_LINE, 150);
-                gfx_text_ellipsis(FS_SM, x + 6, y + 4, w - 10, api_suggest(i),
-                                  sel ? C_WHITE : C_TXT);
+                if (!sel) gfx_round_border_a(x, y, w, 20, 10, C_LINE, 160);
+                gfx_text_ellipsis(FS_SM, x + 6, y + 4, w - 10, txt, sel ? C_WHITE : C_TXT);
             }
+            if (top_n > 3) gfx_text(FS_SM, 15 + 30 + 3 * 100, 73, "…", C_MUTE);
         }
 
-        /* 右列：搜索历史（竖向），不占键盘位置 */
+        if (ime_n > 0) {
+            int win = 4;                 /* 一屏 4 个，左右滚动 */
+            int off = g_app.ime_off;
+
+            gfx_text(FS_SM, left_x, 99, "候选", C_MUTE);
+            if (off > 0) gfx_text(FS_SM, left_x + 30, 99, "‹", C_ACC);
+            for (int i = 0; i < win && off + i < ime_n; ++i) {
+                char tag[40];
+                int idx = off + i;
+                int x = left_x + 46 + i * 68, y = 94, w = 64;
+                int sel = (g_app.kb_row == -2 && g_app.ime_sel == idx);
+
+                snprintf(tag, sizeof(tag), "%s", ime_candidate(idx));
+                gfx_fill_round(x, y, w, 20, 10, sel ? C_ACC : C_PANEL2);
+                if (!sel) gfx_round_border_a(x, y, w, 20, 10, C_LINE, 160);
+                gfx_text_ellipsis(FS_SM, x + 5, y + 4, w - 8, tag, sel ? C_WHITE : C_TXT);
+            }
+            if (off + win < ime_n) gfx_text(FS_SM, left_x + 46 + win * 68, 99, "›", C_ACC);
+        }
+
+        /* 右列：搜索历史（竖向，可选中搜索） */
         {
             int hn = search_hist_count();
             int shown = hn > 4 ? 4 : hn;

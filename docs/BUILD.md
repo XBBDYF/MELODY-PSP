@@ -18,11 +18,11 @@ MELODY 是 PSP 原生程序（MIPS R4000，无 MMU），构建需要 **pspdev �
 
 ### 外部依赖（不在本仓库）
 
-主程序 `Makefile` 里有两处**绝对路径**，构建前要按自己的环境改：
+`Makefile` 用变量 `WILIMINI` 指向 WiliMini 根目录，默认 `E:/WiliMini`，可用 `make WILIMINI=/your/path` 覆盖：
 
 ```
-CFLAGS  += -IE:/WiliMini/decoder/include
-LIBS    += tools/mvtest/build/libpspvideo_cpu.a ... E:/WiliMini/build/ffmpeg-audio-install/lib/libav*.a
+CFLAGS  += -I$(WILIMINI)/decoder/include
+LIBS    += tools/mvtest/build/libpspvideo_cpu.a ... $(WILIMINI)/build/ffmpeg-audio-install/lib/libav*.a
 ```
 
 - `WiliMini`：软件视频解码参考实现（GPL-3.0），提供 `pspvideo` 头文件与 FFmpeg 静态库。

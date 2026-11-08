@@ -96,7 +96,24 @@ perf: draw_us=<UI绘制耗时> flip_wait_us=<等垂直同步的空闲时间> fra
 `THEME-KIT/EXAMPLES/eco/`：整屏 1 个矩形 + 每页最多 4 行文字，无封面、无渐变、无动画、无音效、无字体。
 已通过 `check_skin.py` 与真运行时校验（VALID）。
 
-### 5.3 测量步骤
+### 5.3 已经测到的一个基线数（PPSSPP）
+
+启动/WiFi 页上（两套主题都回落原生界面，所以这里测的是**基线绘制成本**）：
+
+```text
+perf: draw_us=2562 flip_wait_us=12790 frames=300 screen=1   (metro)
+perf: draw_us=3139 flip_wait_us=12157 frames=300 screen=1   (eco)
+```
+
+一帧 15.7ms（60fps）里：
+- 原生 UI 绘制约 **2.5–3.5ms**（16–22% 的 CPU 时间）；
+- 其余 **12.2–12.8ms** 在等垂直同步（空闲）。
+
+这说明两件事：
+1. 即使把主题绘制压到 0，也只能影响这一小段（而背光/音频照旧耗电）→ 纯主题省不出「极其省电」；
+2. `flip_wait_us` 这么大，说明**降频/静帧跳过**有空间——这正是省电模式的价值。
+
+### 5.4 测量步骤
 
 1. 把测试固件 `melody.prx` 和 `eco/` 装进卡；
 2. 电量充满（或记下起始百分比与 `scePowerGetBatteryElec`）；
@@ -109,7 +126,7 @@ perf: draw_us=<UI绘制耗时> flip_wait_us=<等垂直同步的空闲时间> fra
 - 如果 `eco` 的 `draw_us` 只有 `metro` 的 1/3 以下 → 主题侧确实还有可观 CPU 节省空间；
 - 如果两者 `draw_us` 都很小（例如 < 1ms）而 `flip_wait_us` 很大 → **主题不是瓶颈**，收益必须来自降频/静帧跳过/断网，即方案 B。
 
-### 5.4 电池测量的注意点
+### 5.5 电池测量的注意点
 
 - PSP 电量百分比是 1% 粒度，10 分钟可能只掉 1–2%，**建议每次 30–60 分钟**；
 - 更细的读数用 `scePowerGetBatteryElec()`（mAh 级别，视固件支持）；

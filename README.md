@@ -286,20 +286,28 @@ flowchart LR
 # 界面截图
 
 <p align="center">
-  <img src="docs/screenshots/home-metro.png" alt="Metro 主题" width="320">
-  <img src="docs/screenshots/home-xmb.png" alt="XMB 主题" width="320">
-  <img src="docs/screenshots/home-metro-day.png" alt="Metro 浅色" width="320">
-  <img src="docs/screenshots/home-paper.png" alt="Paper 主题" width="320">
+  <img src="docs/screenshots/page-home.png" alt="首页" width="360">
+  <img src="docs/screenshots/page-list.png" alt="歌曲列表" width="360">
 </p>
 <p align="center">
-  <em>Metro · XMB · Metro 浅色 · Paper（皮肤来自 <code>skin_release/melody/skins/</code>）</em>
+  <img src="docs/screenshots/page-player.png" alt="播放页" width="360">
+  <img src="docs/screenshots/page-lyrics.png" alt="歌词页" width="360">
 </p>
+<p align="center">
+  <em>首页 · 歌曲列表 · 播放页 · 歌词页（480×272 原始尺寸）</em>
+</p>
+
+完整截图（MV、设置、关于，以及 9 套主题皮肤）见 **[截图页](docs/SCREENSHOTS.md)**。
 
 # 安装
 
+> **本仓库不提供安装包。** 源码仓库只放代码、皮肤、测试与文档；
+> 编译好的安装包（完整安装 / 在线更新 / 一键替换）在 **QQ 群 1103558445** 的群文件里，
+> 按版本号取用。这样做是为了让源码与二进制各自有唯一来源，避免过期包被反复转发。
+
 ### PSP
 
-1. 从 [Releases](https://github.com/XBBDYF/MELODY-PSP/releases) 下载最新的完整安装包。
+1. 在 QQ 群文件里下载对应版本的安装包（当前 **4.1.1**）。
 2. 解压后把 `PSP` 目录合并到记忆棒根目录（或使用包内的「一键替换」）。
 3. 从 PSP 游戏菜单启动 MELODY。
 
@@ -338,7 +346,10 @@ make WILIMINI=/path/to/WiliMini
 | 文档 | 内容 |
 |---|---|
 | [架构说明](docs/ARCHITECTURE.md) | 进程/线程模型、模块分层、网络三层策略、内存预算、数据契约 |
-| [关键逻辑](docs/LOGIC.md) | 启动联网、搜索、播放、下载、MV、皮肤、更新、诊断 |
+| [关键逻辑](docs/LOGIC.md) | 启动联网、搜索、播放、下载、MV、皮肤、更新、诊断（含流程图） |
+| [截图页](docs/SCREENSHOTS.md) | 原生界面 7 张 + 9 套主题皮肤 + 更新展示图 |
+| [工作流程](docs/WORKFLOW.md) | 开发 → 测试 → 打包 → 发布到群 → 同步开源 的完整流程 |
+| [GitHub 记录](docs/GITHUB.md) | 仓库地址、分支、提交历史、推送方式、Issue 与分发政策 |
 | [构建说明](docs/BUILD.md) | 环境、依赖、命令、宿主机测试、打包发布 |
 | [皮肤与主题](docs/THEMES.md) | `skin.json` 字段、页面名、`ui.*` / `app.*` 全部宿主 API |
 | [测试说明](tests/README.md) | 测试分类、写法约定、需要额外产物的集成用例 |

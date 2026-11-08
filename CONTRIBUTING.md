@@ -1,5 +1,10 @@
 # 参与开发
 
+## 先读这个
+
+- [工作流程](docs/WORKFLOW.md)：开发 → 测试 → 打包 → 发群 → 同步开源
+- [GitHub 记录](docs/GITHUB.md)：仓库信息、推送方式、Issue 约定
+
 ## 先跑起来
 
 1. 读 [docs/BUILD.md](docs/BUILD.md) 配好 pspdev 与外部依赖。

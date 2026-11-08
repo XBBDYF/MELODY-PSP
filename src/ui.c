@@ -1975,60 +1975,73 @@ static void screen_search(float t, float dt)
     if (g_app.kb_edit) {
         int ime = ime_active();
         int ime_n = ime ? ime_candidate_count() : 0;
+        int sug_n = api_suggest_count();
+        int left_x = 15, left_w = 330;      /* 左列：候选 / 推荐 / 联想 */
+        int right_x = 352, right_w = 116;   /* 右列：搜索历史 */
 
-        /* 第一行：输入法候选（优先）或搜索历史 */
+        /* 左列第一行：输入法候选优先，否则推荐搜索 */
         if (ime_n > 0) {
-            int n = ime_n > 6 ? 6 : ime_n;
+            int n = ime_n > 5 ? 5 : ime_n;
+            int cw = 62;
 
             for (int i = 0; i < n; ++i) {
                 char tag[40];
-                int x = 15 + i * 76, y = 68, w = 72;
+                int x = left_x + i * (cw + 4), y = 68;
                 int sel = (g_app.kb_row == -1 && g_app.ime_sel == i);
 
                 snprintf(tag, sizeof(tag), "%d.%s", i + 1, ime_candidate(i));
-                gfx_fill_round(x, y, w, 20, 10, sel ? C_ACC : C_PANEL2);
-                if (!sel) gfx_round_border_a(x, y, w, 20, 10, C_LINE, 160);
-                gfx_text_ellipsis(FS_SM, x + 6, y + 4, w - 10, tag, sel ? C_WHITE : C_TXT);
+                gfx_fill_round(x, y, cw, 20, 10, sel ? C_ACC : C_PANEL2);
+                if (!sel) gfx_round_border_a(x, y, cw, 20, 10, C_LINE, 160);
+                gfx_text_ellipsis(FS_SM, x + 5, y + 4, cw - 8, tag, sel ? C_WHITE : C_TXT);
             }
-        } else {
-            int hn = search_hist_count();
+        } else if (g_app.chips_n > 0) {
+            int n = g_app.chips_n > 4 ? 4 : g_app.chips_n;
+            int cw = 78;
 
-            for (int i = 0; i < hn && i < 4; ++i) {
-                char tag[40];
-                int x = 15 + i * 96, y = 68, w = 92;
+            gfx_text(FS_SM, left_x, 73, "推荐", C_MUTE);
+            for (int i = 0; i < n; ++i) {
+                int x = left_x + 30 + i * (cw + 4), y = 68;
                 int sel = (g_app.kb_row == -1 && g_app.chip_sel == i);
 
-                snprintf(tag, sizeof(tag), "历史 %s", search_hist_at(i));
-                gfx_fill_round(x, y, w, 20, 10, sel ? C_ACC : C_PANEL2);
-                if (!sel) gfx_round_border_a(x, y, w, 20, 10, C_LINE, 150);
-                gfx_text_ellipsis(FS_SM, x + 6, y + 4, w - 10, tag, sel ? C_WHITE : C_SUB);
+                gfx_fill_round(x, y, cw, 20, 10, sel ? C_ACC : C_PANEL2);
+                if (!sel) gfx_round_border_a(x, y, cw, 20, 10, C_LINE, 160);
+                gfx_text_ellipsis(FS_SM, x + 6, y + 4, cw - 10, g_app.chips[i],
+                                  sel ? C_WHITE : C_SUB);
             }
-            if (hn == 0) gfx_text(FS_SM, 16, 73, "历史为空，按 □ 切换输入法", C_MUTE);
         }
 
-        /* 第二行：联想候选（有的话）否则推荐搜索 */
-        {
-            int n = api_suggest_count();
+        /* 左列第二行：联想（有的话）；没有就留空，避免和推荐抢焦点 */
+        if (sug_n > 0 && !ime) {
+            int n = sug_n > 3 ? 3 : sug_n;
 
-            if (n > 0 && !ime) {
-                int first = g_app.sug_focus ? (g_app.sug_sel / 4) * 4 : 0;
+            gfx_text(FS_SM, left_x, 99, "联想", C_MUTE);
+            for (int i = 0; i < n; ++i) {
+                int x = left_x + 30 + i * 100, y = 94, w = 96;
+                int sel = (g_app.sug_focus && g_app.sug_sel == i);
 
-                if (first >= n) first = 0;
-                for (int i = 0; i < 4 && first + i < n; ++i) {
-                    int x = 15 + i * 114, y = 94, w = 108;
-                    int sel = (g_app.sug_focus && first + i == g_app.sug_sel);
-
-                    gfx_fill_round(x, y, w, 20, 4, sel ? C_ACC : C_PANEL2);
-                    if (!sel) gfx_round_border_a(x, y, w, 20, 4, C_LINE, 150);
-                    gfx_text_ellipsis(FS_SM, x + 7, y + 4, w - 12, api_suggest(first + i),
-                                      sel ? C_WHITE : C_TXT);
-                }
-            } else if (g_app.chips_n > 0) {
-                const char *items[APP_CHIP_MAX];
-
-                for (int i = 0; i < g_app.chips_n; ++i) items[i] = g_app.chips[i];
-                search_chip_row(94, "推荐", -2, g_app.chips_n, items, g_app.chip_sel, ime_mode());
+                gfx_fill_round(x, y, w, 20, 10, sel ? C_ACC : C_PANEL2);
+                if (!sel) gfx_round_border_a(x, y, w, 20, 10, C_LINE, 150);
+                gfx_text_ellipsis(FS_SM, x + 6, y + 4, w - 10, api_suggest(i),
+                                  sel ? C_WHITE : C_TXT);
             }
+        }
+
+        /* 右列：搜索历史（竖向），不占键盘位置 */
+        {
+            int hn = search_hist_count();
+            int shown = hn > 4 ? 4 : hn;
+
+            gfx_text(FS_SM, right_x, 52, "历史", C_MUTE);
+            for (int i = 0; i < shown; ++i) {
+                int y = 68 + i * 22;
+                int sel = (g_app.kb_row == -3 && g_app.hist_sel == i);
+
+                if (sel) gfx_fill_round(right_x - 3, y, right_w, 20, 6, C_ACC);
+                else gfx_round_border_a(right_x - 3, y, right_w, 20, 6, C_LINE, 130);
+                gfx_text_ellipsis(FS_SM, right_x + 3, y + 4, right_w - 8,
+                                  search_hist_at(i), sel ? C_WHITE : C_SUB);
+            }
+            if (hn == 0) gfx_text(FS_SM, right_x, 73, "暂无记录", C_MUTE);
         }
 
         /* 键盘 */

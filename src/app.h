@@ -240,6 +240,7 @@ typedef struct {
     int chip_sel;          /* 当前选中的 chip（0 起） */
     int chip_row;          /* 0 = 第一行(历史/候选)，1 = 推荐行 */
     int ime_sel;           /* 候选序号（0 起） */
+    int hist_sel;          /* 历史列选中项（0 起） */
 
     /* 搜索联想 */
     int sug_focus;       /* 1 = 光标在右侧联想列表里 */

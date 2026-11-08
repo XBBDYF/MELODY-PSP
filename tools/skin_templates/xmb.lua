@@ -189,19 +189,23 @@ end
 
 local function xmbSearch(t,m)
  header("搜索",nil,m)
- icon("search",24,67,15,C.dim);local pre=(m.ime_active or 0)==1 and(m.ime_pre or"")or"";text(50,65,330,(m.query and m.query~="")and m.query or"歌曲、歌手、歌单",1,C.fg);if pre~=""then text(50+math.min(ui.text_width(m.query or"",1),300),65,300,pre,0,C.accent)end;if m.search_edit==1 then text(400,65,56,(m.ime_mode or 1)==2 and"假名"or"拼音",0,C.accent)end
+ icon("search",24,67,15,C.dim);local pre=(m.ime_active or 0)==1 and(m.ime_pre or"")or"";text(50,65,330,(m.query and m.query~="")and m.query or"歌曲、歌手、歌单",1,C.fg);if pre~=""then text(50+math.min(ui.text_width(m.query or"",1),300),65,300,pre,0,C.accent)end;if m.search_edit==1 then text(400,65,56,(m.ime_mode or 1)==2 and"假名"or((m.ime_mode or 1)==3 and"英文"or"拼音"),0,C.accent)end
  ui.rect(24,90,432,1,C.line)
  if m.search_edit==1 then
   local cands=m.ime_candidates or{};local hist=m.search_history or{};local recs=m.search_chips or{}
-  if (m.ime_active or 0)==1 then
-   for i,v in ipairs(cands)do local x=17+(i-1)*72;local sel=m.kb_row<=-1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,68,20,C.accent)end;text(x+4,103,64,i.."."..v,0,sel and C.bg or C.fg)end
+  local ime=(m.ime_active or 0)==1
+  if ime then
+   for i=1,math.min(#cands,5)do local x=17+(i-1)*66;local sel=m.chip_row==1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,62,20,C.accent)end;text(x+3,102,57,i.."."..cands[i],0,sel and C.bg or C.fg)end
   else
-   for i,v in ipairs(hist)do local x=17+(i-1)*96;local sel=m.kb_row==-1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,92,20,C.accent)end;text(x+5,103,84,"历史 "..v,0,sel and C.bg or C.dim)end
+   text(17,102,28,"推荐",0,C.dim)
+   for i=1,math.min(#recs,4)do local x=47+(i-1)*74;local sel=m.chip_row==1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,70,20,C.accent)end;text(x+4,102,64,recs[i],0,sel and C.bg or C.fg)end
   end
-  for i,v in ipairs(recs)do local x=17+(i-1)*96;local sel=m.kb_row==-2 and (m.chip_selected or 1)==i;if sel then ui.rect(x,119,92,20,C.accent)end;text(x+5,123,84,v,0,sel and C.bg or C.fg)end
-  local suggestions=m.suggestions or{};local start=math.floor(((m.suggest_selected or 1)-1)/4)*4
-  if (m.ime_active or 0)==0 then for slot=1,4 do local i=start+slot;if suggestions[i]then text(18+(slot-1)*112,123,106,suggestions[i],0,m.suggest_focused==1 and m.suggest_selected==i and C.accent or C.fg)end end end
-  -- Native input_search rows: 10 / 10 / 9 cells, including delete/space/search.
+  if (not ime)and#(m.suggestions or{})>0 then
+   local sgs=m.suggestions or{};local first=math.max(1,math.min(#sgs-2,(m.suggest_selected or 1)));text(17,122,28,"联想",0,C.dim)
+   for slot=0,2 do local i=first+slot;if sgs[i]then local x=47+slot*96;local sel=m.suggest_focused==1 and m.suggest_selected==i;if sel then ui.rect(x,119,92,20,C.accent)end;text(x+4,122,86,sgs[i],0,sel and C.bg or C.fg)end end
+  end
+  text(356,99,110,"历史",0,C.dim)
+  for i=1,math.min(#hist,3)do local y=112+(i-1)*15;local sel=m.chip_row==3 and (m.hist_selected or 1)==i;if sel then ui.rect(353,y-1,116,14,C.accent)end;text(357,y,110,hist[i],0,sel and C.bg or C.dim)end
   local letters={"qwertyuiop","asdfghjkl","zxcvbnm"}
   for r=0,2 do for col=0,(r<2 and 9 or 8)do
    local label=col<#letters[r+1]and string.sub(letters[r+1],col+1,col+1)or r==1 and"←"or col==7 and"空格"or"搜索"

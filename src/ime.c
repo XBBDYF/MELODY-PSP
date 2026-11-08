@@ -302,14 +302,17 @@ int ime_mode(void)
 
 void ime_set_mode(int mode)
 {
-    if (mode != IME_OFF && mode != IME_PINYIN && mode != IME_KANA) return;
+    if (mode != IME_OFF && mode != IME_PINYIN && mode != IME_KANA && mode != IME_ASCII) return;
     ime_reset();
     g_mode = mode;
 }
 
 void ime_toggle_mode(void)
 {
-    ime_set_mode(g_mode == IME_KANA ? IME_PINYIN : IME_KANA);
+    /* 循环：拼音 → 假名 → 英文 → 拼音 */
+    if (g_mode == IME_PINYIN) ime_set_mode(IME_KANA);
+    else if (g_mode == IME_KANA) ime_set_mode(IME_ASCII);
+    else ime_set_mode(IME_PINYIN);
 }
 
 int ime_active(void)
@@ -343,6 +346,9 @@ int ime_feed(int ch)
     int len = (int)strlen(g_pre);
 
     g_last[0] = 0;
+
+    /* 英文直输：不消费按键，调用方把字母写进搜索框 */
+    if (g_mode == IME_ASCII) return 2;
 
     if (ch == '\b' || ch == 127) {
         ime_backspace();

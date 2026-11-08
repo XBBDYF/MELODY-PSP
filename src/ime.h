@@ -16,7 +16,8 @@
 enum {
     IME_OFF = 0,
     IME_PINYIN = 1,
-    IME_KANA = 2
+    IME_KANA = 2,
+    IME_ASCII = 3        /* 英文直输：字母直接进搜索框，不产生 preedit */
 };
 
 #define IME_MAX_CAND   8

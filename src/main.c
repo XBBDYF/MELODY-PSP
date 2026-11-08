@@ -1830,6 +1830,20 @@ static void query_backspace(void)
     g_app.query_len = len;
 }
 
+/* 字母进输入法：ASCII 模式直接写搜索框，拼音/假名先进 preedit */
+static void search_type_char(char ch)
+{
+    int r = ime_feed(ch);
+
+    if (r == 2) {
+        char s[2] = { ch, 0 };
+
+        query_append(s);
+    } else if (r == 1) {
+        query_append(ime_last_commit());
+    }
+}
+
 static void input_search(unsigned int pressed, unsigned int held, float dt)
 {
     static const char *kb0 = "qwertyuiop";
@@ -1895,7 +1909,7 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
 
     if (pressed & PSP_CTRL_SQUARE) {
         ime_toggle_mode();
-        ui_toast(ime_mode() == IME_KANA ? "输入法：假名（罗马字）" : "输入法：拼音");
+        ui_toast(ime_mode() == IME_KANA ? "输入法：假名（罗马字）" : ime_mode() == IME_ASCII ? "输入法：英文直输" : "输入法：拼音");
         g_app.ime_sel = 0;
         return;
     }
@@ -1954,56 +1968,77 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
         return;
     }
 
-    /* 两行 chip 区：-1 = 候选/历史，-2 = 推荐 */
+    /* 焦点行：-1 = 左列第一行（候选/推荐），-2 = 左列第二行（联想），-3 = 右列历史 */
     if (g_app.kb_row <= -1) {
         int ime = ime_active();
         int cand_n = ime ? ime_candidate_count() : 0;
-        int row1_n = ime ? cand_n : search_hist_count();
-        int is_row2 = (g_app.kb_row == -2);
+        int sug_n = api_suggest_count();
+        int hist_n = search_hist_count();
+        int row = g_app.kb_row;
 
-        if (ime) g_app.chip_sel = 0;
+        if (row == -1 && !ime && g_app.chip_sel >= g_app.chips_n && g_app.chips_n > 0)
+            g_app.chip_sel = g_app.chips_n - 1;
+        if (row == -1 && ime && g_app.ime_sel >= cand_n) g_app.ime_sel = cand_n ? cand_n - 1 : 0;
+        if (row == -2 && g_app.sug_sel >= sug_n) g_app.sug_sel = sug_n ? sug_n - 1 : 0;
+        if (row == -3 && g_app.hist_sel >= hist_n) g_app.hist_sel = hist_n ? hist_n - 1 : 0;
 
         if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT)) {
-            if (is_row2) {
-                if (g_app.chip_sel > 0) g_app.chip_sel--;
-            } else if (ime) {
+            if (row == -1 && ime) {
                 if (g_app.ime_sel > 0) g_app.ime_sel--;
-            } else if (g_app.chip_sel > 0) {
-                g_app.chip_sel--;
+            } else if (row == -1) {
+                if (g_app.chip_sel > 0) g_app.chip_sel--;
+            } else if (row == -2) {
+                if (g_app.sug_sel > 0) g_app.sug_sel--;
             }
         }
         if (btn_repeat(pressed, held, dt, PSP_CTRL_RIGHT)) {
-            if (is_row2) {
-                if (g_app.chip_sel + 1 < g_app.chips_n) g_app.chip_sel++;
-            } else if (ime) {
+            if (row == -1 && ime) {
                 if (g_app.ime_sel + 1 < cand_n) g_app.ime_sel++;
-            } else if (g_app.chip_sel + 1 < row1_n) {
-                g_app.chip_sel++;
+            } else if (row == -1) {
+                if (g_app.chip_sel + 1 < g_app.chips_n) g_app.chip_sel++;
+            } else if (row == -2) {
+                if (g_app.sug_sel + 1 < sug_n) g_app.sug_sel++;
             }
         }
         if (btn_repeat(pressed, held, dt, PSP_CTRL_UP)) {
-            if (!is_row2) g_app.kb_row = -2;
+            if (row == -1) g_app.kb_row = hist_n > 0 ? -3 : (sug_n > 0 ? -2 : -1);
+            else if (row == -2) g_app.kb_row = -1;
+            else if (hist_n > 0 && g_app.hist_sel > 0) g_app.hist_sel--;
         }
         if (btn_repeat(pressed, held, dt, PSP_CTRL_DOWN)) {
-            g_app.kb_row = is_row2 ? -1 : 0;
-            if (!is_row2 && g_app.kb_col > 9) g_app.kb_col = 9;
+            if (row == -3) {
+                if (g_app.hist_sel + 1 < hist_n) g_app.hist_sel++;
+                else g_app.kb_row = -1;
+            } else if (row == -2) {
+                g_app.kb_row = 0;
+                if (g_app.kb_col > 9) g_app.kb_col = 9;
+            } else {
+                g_app.kb_row = sug_n > 0 ? -2 : 0;
+                if (g_app.kb_row == 0 && g_app.kb_col > 9) g_app.kb_col = 9;
+            }
         }
         if (pressed & PSP_CTRL_CIRCLE) {
-            char out[64];
-
-            if (ime && !is_row2) {
-                if (ime_select(g_app.ime_sel, out, (int)sizeof(out)) > 0) {
-                    query_append(out);
-                    g_app.ime_sel = 0;
-                    mlog("ime commit: %s", out);
-                }
-            } else if (!is_row2) {
-                const char *q = search_hist_at(g_app.chip_sel);
+            if (row == -3) {
+                const char *q = search_hist_at(g_app.hist_sel);
 
                 if (q[0]) {
                     snprintf(g_app.query, sizeof(g_app.query), "%s", q);
                     g_app.query_len = (int)strlen(g_app.query);
                     search_do(g_app.query);
+                }
+            } else if (row == -2) {
+                if (sug_n > 0) {
+                    snprintf(g_app.query, sizeof(g_app.query), "%s", api_suggest(g_app.sug_sel));
+                    g_app.query_len = (int)strlen(g_app.query);
+                    search_do(g_app.query);
+                }
+            } else if (ime) {
+                char out[64];
+
+                if (ime_select(g_app.ime_sel, out, (int)sizeof(out)) > 0) {
+                    query_append(out);
+                    g_app.ime_sel = 0;
+                    mlog("ime commit: %s", out);
                 }
             } else if (g_app.chips_n > 0) {
                 snprintf(g_app.query, sizeof(g_app.query), "%s", g_app.chips[g_app.chip_sel]);
@@ -2041,14 +2076,10 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
         int row = g_app.kb_row, col = g_app.kb_col;
 
         if (row == 0) {
-            char ch = kb0[col];
-
-            if (ime_feed(ch)) query_append(ime_last_commit());
+            search_type_char(kb0[col]);
         } else if (row == 1) {
             if (col < 9) {
-                char ch = kb1[col];
-
-                if (ime_feed(ch)) query_append(ime_last_commit());
+                search_type_char(kb1[col]);
             } else if (ime_active()) {
                 ime_backspace();
             } else {
@@ -2056,11 +2087,11 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
             }
         } else {
             if (col < 7) {
-                char ch = kb2[col];
-
-                if (ime_feed(ch)) query_append(ime_last_commit());
+                search_type_char(kb2[col]);
             } else if (col == 7) {
-                if (ime_active()) {
+                if (ime_mode() == IME_ASCII) {
+                    query_append(" ");
+                } else if (ime_active()) {
                     char out[64];
 
                     if (ime_candidate_count() > 0 &&
@@ -2068,6 +2099,7 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
                         query_append(out);
                     else if (ime_commit_raw(out, (int)sizeof(out)) > 0)
                         query_append(out);
+                    mlog("ime commit: %s", out);
                 } else {
                     query_append(" ");
                 }
@@ -2077,6 +2109,8 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
 
                     if (ime_candidate_count() > 0 &&
                         ime_select(g_app.ime_sel, out, (int)sizeof(out)) > 0)
+                        query_append(out);
+                    else if (ime_commit_raw(out, (int)sizeof(out)) > 0)
                         query_append(out);
                 } else {
                     search_do(g_app.query);

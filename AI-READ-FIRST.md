@@ -107,6 +107,7 @@ flowchart LR
 | 搜索历史与推荐 | `src/search_history.c`、`src/search_chips.c` | 历史持久化格式、推荐优先级时读 [docs/SEARCH-UI.md](docs/SEARCH-UI.md) |
 | 主题自带字体 | `src/skin_font.c`、`gfx.c:pick_glyph`、`tools/make_theme_font.py` | 字体格式、预算、回退链；校验用 `tools/validate_skin_fonts.py` |
 | 教别人做主题 / 给 AI 的主题说明 | `THEME-KIT/README.md`、`THEME-KIT/02-AI-GUIDE.md` | 分发用压缩包 `MELODY-THEME-KIT.zip`；内部细节仍看 `docs/THEMES.md` 与 `src/skin_runtime.c` |
+| 省电主题可行性 / 功耗测量 | `docs/POWER-SAVING-THEME.md`、`THEME-KIT/EXAMPLES/eco` | 用 `perf:` 日志（`draw_us`/`flip_wait_us`）做对照实验 |
 | 运行流程 | [PROJECT-RUNTIME.md](PROJECT-RUNTIME.md) | 跨线程、跨模块问题才读完整链路 |
 | 当前发布二进制 | `releases/MELODY-4.1.1/manifest.json` | 安装、发包、对比设备版本时 |
 | 开源仓库与分发政策 | `E:\MELODY-PSP-OPENSOURCE\MELODY-PSP\docs\WORKFLOW.md`、`E:\MELODY-PSP-OPENSOURCE\MELODY-PSP\docs\GITHUB.md` | 提交代码、同步开源副本、回答「从哪下载」时 |

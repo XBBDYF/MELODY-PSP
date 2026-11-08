@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "eco",
+  "name": "ECO 省电原型",
+  "author": "MELODY",
+  "version": "0.1",
+  "description": "验证用：整屏 1 块底色 + 4 行文字，无封面/渐变/动画/音效",
+  "dark": true,
+  "colors": {
+    "background": "#000000",
+    "panel": "#000000",
+    "panel2": "#000000",
+    "text": "#DDDDDD",
+    "secondary": "#AAAAAA",
+    "muted": "#777777",
+    "line": "#333333",
+    "accent": "#66CC99",
+    "hot": "#66CC99",
+    "row": "#111111",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#66CC99",
+    "warning": "#CC9955",
+    "shadow": "#000000"
+  },
+  "script": "skin.lua"
+}

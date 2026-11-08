@@ -4140,6 +4140,8 @@ int app_main(void)
     if (dev_mode() == 40) api_request_update_check();
 
     while (running) {
+        static unsigned perf_draw_sum, perf_flip_sum, perf_frames;
+        unsigned perf_draw0 = (unsigned)sceKernelGetSystemTimeLow();
         float t = now_sec();
         float dt = t - last_t;
         unsigned int pressed, held;
@@ -4713,12 +4715,26 @@ int app_main(void)
         } else {
             if (g_exit_confirm) g_app.confirm_clear = 5;
             g_app.time=now_sec(); /* Catalog I/O must not age the first closing frame. */
+            perf_draw0 = (unsigned)sceKernelGetSystemTimeLow();
             ui_draw();
             if(policy_open)ui_document("隐私政策",community_privacy_text(),policy_scroll,"○ / × 返回设置");
             else if(notice_open){const CommunityAnnouncement*n=community_announcement_get();if(n)ui_document(n->title,n->text,notice_scroll,notice_ignore?"[已选] 下次不弹  □切换  ○关闭":"[未选] 下次不弹  □切换  ○关闭");}
             if (g_exit_confirm) g_app.confirm_clear = 0;
             if(update_gallery_active()){ui_free_skin_preview();update_gallery_draw(g_app.time);}
-            gfx_flip();
+            {
+                unsigned perf_draw1 = (unsigned)sceKernelGetSystemTimeLow();
+
+                perf_draw_sum += perf_draw1 - perf_draw0;
+                gfx_flip();
+                perf_flip_sum += (unsigned)sceKernelGetSystemTimeLow() - perf_draw1;
+                perf_frames++;
+                if (perf_frames >= 300) {
+                    mlog("perf: draw_us=%u flip_wait_us=%u frames=%u screen=%d",
+                         perf_draw_sum / perf_frames, perf_flip_sum / perf_frames,
+                         perf_frames, g_app.screen);
+                    perf_draw_sum = perf_flip_sum = perf_frames = 0;
+                }
+            }
         }
 
         /* 绘制期间（可能有几十毫秒）按下的键：再采一次攒给下一帧，

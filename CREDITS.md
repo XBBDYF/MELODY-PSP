@@ -7,7 +7,7 @@ MELODY 能跑起来，靠的不只是这个仓库里的代码。这里按「帮�
 - **洗不白de衣服（XBBDYF）** — 程序、界面、皮肤、打包与全部真机调试
   - GitHub：https://github.com/XBBDYF
   - B 站：https://space.bilibili.com/535975174
-  - 博客：https://xbbdyf.github.io
+  - 官网：https://xbbdyf.github.io/retro/index.html
 
 ## 交流与反馈
 

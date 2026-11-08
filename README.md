@@ -12,6 +12,13 @@ MELODY PSP
   原生 C 实现 · 硬件 MP3 解码 · Lua 可换肤 · 在线更新
 </p>
 <p align="center">
+  <a href="https://afdian.com/a/hoi4-province-editor"><img src="docs/assets/badge-afdian.png" alt="爱发电 · 支持开发" height="48"></a>
+</p>
+<p align="center">
+  <sub>MELODY 由个人维护：服务器、域名与在线更新的流量都是自费。<br>
+  如果它帮你把吃灰的 PSP 又用了起来，欢迎到爱发电支持服务器维护与后续开发。</sub>
+</p>
+<p align="center">
   <b><a href="#特点">特点</a></b>
   |
   <b><a href="#架构">架构</a></b>
@@ -21,6 +28,8 @@ MELODY PSP
   <b><a href="#文档">文档</a></b>
   |
   <b><a href="#开发">开发</a></b>
+  |
+  <b><a href="#支持">支持</a></b>
   |
   <b><a href="#致谢">致谢</a></b>
 </p>
@@ -530,11 +539,29 @@ MELODY 以 **GNU General Public License v3.0** 发布，见 [LICENSE](LICENSE)�
 | [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi) | 接口字段与调用方式资料（未内置该服务） | MIT |
 | [MElib](https://github.com/IridescentRose/MElib) | ME 通信研究 | MIT |
 
-## 交流与支持
+# 支持
 
-- QQ 群：**1103558445**（PSP 网易云交流群）
-- 爱发电：[afdian.com/a/hoi4-province-editor](https://afdian.com/a/hoi4-province-editor)
-- 作者：[XBBDYF](https://github.com/XBBDYF) · B 站 [535975174](https://space.bilibili.com/535975174)
+<p align="center">
+  <a href="https://afdian.com/a/hoi4-province-editor"><img src="docs/assets/badge-afdian.png" alt="爱发电 · 支持开发" height="48"></a>
+  &nbsp;
+  <a href="https://xbbdyf.github.io/retro/index.html"><img src="docs/assets/badge-site.png" alt="作者官网" height="48"></a>
+  &nbsp;
+  <a href="https://space.bilibili.com/535975174"><img src="docs/assets/badge-bilibili.png" alt="B 站" height="48"></a>
+</p>
+
+| 渠道 | 用途 |
+|---|---|
+| [爱发电](https://afdian.com/a/hoi4-province-editor) | 服务器、域名与在线更新流量开销；支持后续开发（完全自愿，不影响任何功能） |
+| [作者官网](https://xbbdyf.github.io/retro/index.html) | 项目主页、更新记录与相关工具 |
+| [B 站](https://space.bilibili.com/535975174) | 演示视频与版本发布说明 |
+| QQ 群 **1103558445** | 安装包分发、问题反馈、真机测试（**安装包只在群里提供**） |
+| [GitHub](https://github.com/XBBDYF/MELODY-PSP) | 源码、Issue、文档 |
+
+> 打赏不会解锁任何功能，也不是使用本程序的前提；它只用来支付服务器与后续开发的成本。
+
+<p align="center">
+  <img src="docs/assets/qq-group.png" alt="交流群" width="240">
+</p>
 
 <p align="center">
   <img src="docs/assets/qq-group.png" alt="交流群" width="240">

@@ -35,7 +35,7 @@ static const char *const k_credits[] = {
     "github.com/XBBDYF",
     "B站：535975174",
     "space.bilibili.com/535975174",
-    "博客：xbbdyf.github.io",
+    "官网：xbbdyf.github.io/retro",
     "",
     "## 开源计划与许可证",
     "项目计划开源，源码仓库尚待公布。",

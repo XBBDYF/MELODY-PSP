@@ -10,7 +10,9 @@
 | 项 | 值 |
 |---|---|
 | 地址 | https://github.com/XBBDYF/MELODY-PSP |
-| 所有者 | [XBBDYF](https://github.com/XBBDYF)（洗不白de衣服） |
+| 所有者 | [XBBDYF](https://github.com/XBBDYF)（洗不白de衣服）
+| 作者官网 | https://xbbdyf.github.io/retro/index.html |
+| 支持 | [爱发电](https://afdian.com/a/hoi4-province-editor) |
 | 可见性 | Public |
 | 默认分支 | `main` |
 | 许可证 | GNU GPL v3.0（[LICENSE](../LICENSE)） |

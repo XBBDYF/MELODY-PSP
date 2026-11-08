@@ -249,6 +249,77 @@ static void collect(const ImeEntry *tab, int n, const char *key, int exact_only)
 }
 
 /* 结尾孤立的 n 在提交时才转成 ん（避免 "na" 被拆成 ん+あ） */
+/* 单字候选：key 是音节。exact=1 只要同音节，exact=0 收以 prefix 开头的音节。 */
+static void char_candidates(const char *prefix, int exact, int max)
+{
+    int lo, hi, i, added = 0, kl = (int)strlen(prefix);
+
+    if (!prefix[0] || max <= 0) return;
+    {
+        int a = 0, b = k_ime_chars_count;
+
+        while (a < b) {
+            int mid = (a + b) / 2;
+
+            if (strncmp(k_ime_chars[mid].key, prefix, (size_t)kl) < 0) a = mid + 1;
+            else b = mid;
+        }
+        lo = a;
+        b = k_ime_chars_count;
+        while (a < b) {
+            int mid = (a + b) / 2;
+
+            if (strncmp(k_ime_chars[mid].key, prefix, (size_t)kl) <= 0) a = mid + 1;
+            else b = mid;
+        }
+        hi = a;
+    }
+
+    for (i = lo; i < hi && added < max; ++i) {
+        const char *c = k_ime_chars[i].chars;
+
+        if (exact && strcmp(k_ime_chars[i].key, prefix)) continue;
+        while (*c && added < max) {
+            char one[8];
+            int n = 1;
+
+            if ((*c & 0xE0) == 0xC0) n = 2;
+            else if ((*c & 0xF0) == 0xE0) n = 3;
+            else if ((*c & 0xF8) == 0xF0) n = 4;
+            memcpy(one, c, (size_t)n);
+            one[n] = 0;
+            cand_add(one);
+            c += n;
+            added++;
+        }
+    }
+}
+
+/* 词库里的首字：输入单字母时给几个「相关单字」而不是只有整词 */
+static void word_initial_candidates(const char *prefix, int max)
+{
+    int lo, hi, i, added = 0, kl = (int)strlen(prefix);
+
+    if (!prefix[0] || max <= 0) return;
+    range(k_ime_pinyin, k_ime_pinyin_count, prefix, &lo, &hi);
+    for (i = lo; i < hi && added < max; ++i) {
+        const char *w = k_ime_pinyin[i].word;
+        char one[8];
+        int n = 1;
+
+        if (!w[0]) continue;
+        if ((*w & 0xE0) == 0xC0) n = 2;
+        else if ((*w & 0xF0) == 0xE0) n = 3;
+        else if ((*w & 0xF8) == 0xF0) n = 4;
+        if (n == 1) continue;                 /* 跳过 ASCII */
+        memcpy(one, w, (size_t)n);
+        one[n] = 0;
+        cand_add(one);
+        added++;
+        (void)kl;
+    }
+}
+
 static void rebuild_candidates(void);
 
 static void kana_finish(void)
@@ -267,6 +338,10 @@ static void rebuild_candidates(void)
 
     if (g_mode == IME_PINYIN) {
         if (!g_pre[0]) return;
+        /* 顺序：整词完全匹配 → 同音节单字 → 词首字 → 前缀词 */
+        collect(k_ime_pinyin, k_ime_pinyin_count, g_pre, 1);
+        if (g_cand_n < 5) char_candidates(g_pre, 1, 5 - g_cand_n);
+        if (g_cand_n < 5) word_initial_candidates(g_pre, 5 - g_cand_n);
         collect(k_ime_pinyin, k_ime_pinyin_count, g_pre, 0);
         return;
     }

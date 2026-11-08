@@ -41,12 +41,18 @@ int main(void)
     assert(!strcmp(ime_candidate(0), "周杰伦"));        /* freq 最高 */
 
     ime_reset();
+    type_str("chen");
+    assert(has_cand("陈") && has_cand("晨") && has_cand("辰"));   /* 单字优先 */
+    assert(has_cand("陈奕迅"));
+
+    ime_reset();
     type_str("zhong");
     assert(has_cand("中国"));
+    assert(!strcmp(ime_candidate(0), "中"));            /* 同音节单字在前 */
     {
         char out[32];
         assert(ime_select(0, out, sizeof(out)) > 0);
-        assert(!strcmp(out, "中国"));
+        assert(!strcmp(out, "中"));
         assert(!ime_active());                          /* 上屏后清空 */
     }
 

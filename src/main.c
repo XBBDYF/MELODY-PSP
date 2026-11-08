@@ -1833,6 +1833,7 @@ static void query_backspace(void)
 /* 字母进输入法：ASCII 模式直接写搜索框，拼音/假名先进 preedit */
 static void search_type_char(char ch)
 {
+    static char last_pre[24];
     int r = ime_feed(ch);
 
     if (r == 2) {
@@ -1841,6 +1842,10 @@ static void search_type_char(char ch)
         query_append(s);
     } else if (r == 1) {
         query_append(ime_last_commit());
+    }
+    if (ime_active() && ime_candidate_count() == 0 && strcmp(last_pre, ime_preedit())) {
+        snprintf(last_pre, sizeof(last_pre), "%s", ime_preedit());
+        mlog("ime: no candidate for [%s] mode=%d", ime_preedit(), ime_mode());
     }
 }
 
@@ -1926,8 +1931,19 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
         return;
     }
     if (pressed & PSP_CTRL_TRIANGLE) {
+        /* △ = 联想：先把输入法里拼好的字母上屏，再请求联想；删字交给键盘的 ← 键 */
         if (ime_active()) {
-            ime_backspace();
+            char raw[64];
+
+            if (ime_commit_raw(raw, (int)sizeof(raw)) > 0) query_append(raw);
+            snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
+            if (g_app.query[0]) {
+                g_app.sug_state = 1;
+                g_app.sug_sel = 0;
+                api_request_suggest(g_app.query);
+                g_app.sug_focus = 1;
+                ui_toast("联想中…");
+            }
             return;
         }
         if (api_suggest_count() > 0) {
@@ -1935,6 +1951,22 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
             if (g_app.sug_sel >= api_suggest_count()) g_app.sug_sel = 0;
         }
         return;
+    }
+
+    /* 联想：输入变化 0.45 秒后才请求；输入法还在拼写时不请求，避免和候选抢行 */
+    if (!ime_active() && !g_app.sug_focus && strcmp(g_app.query, g_app.sug_last)) {
+        g_app.sug_t += dt;
+        if (g_app.sug_t > 0.45f) {
+            g_app.sug_t = 0;
+            snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
+            if (g_app.query[0]) {
+                g_app.sug_state = 1;
+                g_app.sug_sel = 0;
+                api_request_suggest(g_app.query);
+            } else {
+                g_app.sug_state = 0;
+            }
+        }
     }
 
     /* 联想面板焦点（沿用旧逻辑） */

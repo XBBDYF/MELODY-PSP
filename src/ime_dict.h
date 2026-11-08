@@ -16,6 +16,12 @@ typedef struct {
     unsigned char freq;   /* 1..9，越大越靠前 */
 } ImeEntry;
 
+/* 单字表：一个音节对应的常用字（按 GB2312 常用序） */
+typedef struct {
+    const char *key;     /* 音节，无声调 */
+    const char *chars;   /* 该音节的常用字（UTF-8） */
+} ImeCharGroup;
+
 #include "ime_dict_data.h"
 
 #endif /* MELODY_IME_DICT_H */

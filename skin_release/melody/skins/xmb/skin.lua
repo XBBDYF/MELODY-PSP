@@ -195,7 +195,8 @@ local function xmbSearch(t,m)
   local cands=m.ime_candidates or{};local hist=m.search_history or{};local recs=m.search_chips or{}
   local ime=(m.ime_active or 0)==1
   if ime then
-   for i=1,math.min(#cands,5)do local x=17+(i-1)*66;local sel=m.chip_row==1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,62,20,C.accent)end;text(x+3,102,57,i.."."..cands[i],0,sel and C.bg or C.fg)end
+   text(17,102,26,"候选",0,C.dim)
+   for i=1,math.min(#cands,4)do local x=45+(i-1)*70;local sel=m.chip_row==1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,66,20,C.accent)end;text(x+3,102,61,i.."."..cands[i],0,sel and C.bg or C.fg)end
   else
    text(17,102,28,"推荐",0,C.dim)
    for i=1,math.min(#recs,4)do local x=47+(i-1)*74;local sel=m.chip_row==1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,70,20,C.accent)end;text(x+4,102,64,recs[i],0,sel and C.bg or C.fg)end

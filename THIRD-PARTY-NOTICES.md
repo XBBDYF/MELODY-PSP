@@ -22,6 +22,13 @@ WiliMini 的解码代码（GPL-3.0）与 FFmpeg（LGPL-2.1-or-later）。
 - 用途：封面 JPEG 解码（PSP 硬件 `sceJpeg` 的补充路径）
 - Copyright © 1991–2020 Thomas G. Lane, Guido Vollbeding；© 2009–2024 libjpeg-turbo contributors
 
+### pinyin-data（单字读音表）
+
+- 位置：	ools/ime/pinyin-data.txt
+- 许可证：**MIT**
+- 来源：https://github.com/mozillazg/pinyin-data（基于 Unicode Unihan 的读音整理）
+- 用途：	ools/build_ime_dict.py 生成搜索结果里的单字候选表（k_ime_chars[]），不进入绘制/解码路径
+
 ### 点阵字库
 
 - 位置：`src/font12.bin` `src/font16.bin` `src/font22.bin` `src/font32.bin`

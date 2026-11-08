@@ -1981,12 +1981,14 @@ static void screen_search(float t, float dt)
 
         /* 左列第一行：输入法候选优先，否则推荐搜索 */
         if (ime_n > 0) {
-            int n = ime_n > 5 ? 5 : ime_n;
-            int cw = 62;
+            int n = ime_n > 4 ? 4 : ime_n;
+            int cw = 66;
+
+            gfx_text(FS_SM, left_x, 73, "候选", C_MUTE);
 
             for (int i = 0; i < n; ++i) {
                 char tag[40];
-                int x = left_x + i * (cw + 4), y = 68;
+                int x = left_x + 26 + i * (cw + 4), y = 68;
                 int sel = (g_app.kb_row == -1 && g_app.ime_sel == i);
 
                 snprintf(tag, sizeof(tag), "%d.%s", i + 1, ime_candidate(i));
@@ -2074,7 +2076,7 @@ static void screen_search(float t, float dt)
         }
 
         {
-            const char *tip = ime_n > 0 ? "○ 上屏 · △ 删字母 · □ 中/日 · ←→ 选词"
+            const char *tip = ime_n > 0 ? "○ 上屏 · △ 联想 · □ 中/日/英 · ← 删除"
                                         : "↑↓←→ 选键 · ○ 确认 · △ 联想 · □ 中/日";
 
             if (g_app.search_state == 1) tip = "正在搜索 ...";

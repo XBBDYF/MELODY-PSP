@@ -262,12 +262,13 @@ local function songs(t,m)
  for _,s in ipairs(m.songs or{})do if s.index>=first and shown<4 then songRow(78+shown*39,s,s.index==m.selected,m);shown=shown+1 end end;bar(m.download_select_mode==1 and selectionHint(m)or"○播放  △下载  L多选下载","←→快移  ×返回")
 end
 local function search(t,m)
- header("搜索",nil,m);ui.rect(17,63,444,30,"#FFFFFF");icon("search",26,70,16,"#151515");local pre=(m.ime_active or 0)==1 and(m.ime_pre or"")or"";text(51,70,330,m.query~=""and m.query or"歌曲、歌手、歌单",0,"#333333");if pre~=""then local qw=ui.text_width(m.query or"",1);text(51+math.min(qw,300),70,300,pre,0,C.accent)end;if m.search_edit==1 then text(400,70,56,(m.ime_mode or 1)==2 and"假名"or((m.ime_mode or 1)==3 and"英文"or"拼音"),0,C.accent)end
+ header("搜索",nil,m);ui.rect(17,63,444,30,"#FFFFFF");icon("search",26,70,16,"#151515");local pre=(m.ime_active or 0)==1 and(m.ime_pre or"")or"";if(m.query or"")~=""then text(51,70,330,m.query,0,"#333333")elseif pre==""then text(51,70,330,"歌曲、歌手、歌单",0,"#333333")end;if pre~=""then local qw=ui.text_width(m.query or"",1);text(51+math.min(qw,300),70,300,pre,0,C.accent)end;if m.search_edit==1 then text(400,70,56,(m.ime_mode or 1)==2 and"假名"or((m.ime_mode or 1)==3 and"英文"or"拼音"),0,C.accent)end
  if m.search_edit==1 then
   local cands=m.ime_candidates or{};local hist=m.search_history or{};local recs=m.search_chips or{}
   local ime=(m.ime_active or 0)==1
   if ime then
-   for i=1,math.min(#cands,5)do local x=17+(i-1)*66;local sel=m.chip_row==1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,62,20,C.accent)end;text(x+3,102,57,i.."."..cands[i],0,sel and C.bg or C.fg)end
+   text(17,102,26,"候选",0,C.dim)
+   for i=1,math.min(#cands,4)do local x=45+(i-1)*70;local sel=m.chip_row==1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,66,20,C.accent)end;text(x+3,102,61,i.."."..cands[i],0,sel and C.bg or C.fg)end
   else
    text(17,102,28,"推荐",0,C.dim)
    for i=1,math.min(#recs,4)do local x=47+(i-1)*74;local sel=m.chip_row==1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,70,20,C.accent)end;text(x+4,102,64,recs[i],0,sel and C.bg or C.fg)end

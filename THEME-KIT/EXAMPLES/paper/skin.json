@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "paper",
+  "name": "千禧纸面",
+  "author": "洗不白de衣服 / XBBDYF",
+  "version": "1.0",
+  "description": "带动画、功能入口与模块复用的脚本界面",
+  "dark": false,
+  "colors": {
+    "background": "#EEECE2",
+    "panel": "#F6F4EC",
+    "text": "#25241F",
+    "secondary": "#66645A",
+    "muted": "#858174",
+    "line": "#BFB9A9",
+    "accent": "#8C1729",
+    "hot": "#8C1729",
+    "panel2": "#E4E1D5",
+    "row": "#DDD8CA",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#54D49B",
+    "warning": "#F5A957",
+    "shadow": "#000000"
+  },
+  "script": "skin.lua"
+}

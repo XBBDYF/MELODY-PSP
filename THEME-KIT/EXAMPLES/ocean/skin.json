@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "ocean",
+  "name": "海洋蓝",
+  "author": "洗不白de衣服 / XBBDYF",
+  "version": "1.0",
+  "description": "基础全页面配色，即时切换",
+  "dark": true,
+  "colors": {
+    "background": "#111114",
+    "panel": "#19191E",
+    "text": "#F4F4F4",
+    "secondary": "#B6B6BF",
+    "muted": "#81818D",
+    "line": "#34343D",
+    "accent": "#246CD6",
+    "hot": "#246CD6",
+    "panel2": "#25252B",
+    "row": "#292930",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#54D49B",
+    "warning": "#F5A957",
+    "shadow": "#000000"
+  }
+}

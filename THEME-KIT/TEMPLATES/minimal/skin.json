@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "id": "my_theme",
+  "name": "我的主题",
+  "author": "你的名字",
+  "version": "1.0",
+  "description": "最小可用脚本主题：改颜色、改文字就能用",
+  "dark": true,
+  "colors": {
+    "background": "#101418",
+    "panel": "#171B21",
+    "panel2": "#1E242C",
+    "text": "#F2F5F8",
+    "secondary": "#B8C2CC",
+    "muted": "#7C8894",
+    "line": "#2C343E",
+    "accent": "#4FC3A1",
+    "hot": "#F07167",
+    "row": "#232A33",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#54D49B",
+    "warning": "#F5A957",
+    "shadow": "#000000"
+  },
+  "script": "skin.lua",
+  "preferences": [
+    {
+      "id": "show_hint",
+      "label": "底部按键提示",
+      "type": "toggle",
+      "default": 1
+    }
+  ]
+}

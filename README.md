@@ -363,6 +363,7 @@ make WILIMINI=/path/to/WiliMini
 | [皮肤与主题](docs/THEMES.md) | `skin.json` 字段、页面名、`ui.*` / `app.*` 全部宿主 API |
 | [搜索页设计](docs/SEARCH-UI.md) | 输入法候选、搜索历史、推荐搜索的布局与按键 |
 | [输入法与主题字体](docs/IME-AND-FONTS.md) | 词表格式、罗马字规则、PSPF 字库与体积预算 |
+| [主题制作包 THEME-KIT](THEME-KIT/README.md) | 给人类和 AI 的主题制作教程、API 全表、模板、校验工具 |
 | [测试说明](tests/README.md) | 测试分类、写法约定、需要额外产物的集成用例 |
 | [更新记录](CHANGELOG.md) | 4.1.1 → 4.1 → 4.0.1 → 4.0 → 3.5.0 → 3.4.x |
 | [第三方组件](THIRD-PARTY-NOTICES.md) | 每个依赖的许可证与影响 |

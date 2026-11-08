@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "id": "my_widget",
+  "name": "我的方块主题",
+  "author": "你的名字",
+  "version": "1.0",
+  "description": "不写 Lua，只用 widget 摆一块面板",
+  "dark": true,
+  "colors": {
+    "background": "#14181E",
+    "panel": "#1B222B",
+    "panel2": "#222A35",
+    "text": "#F2F5F8",
+    "secondary": "#B8C2CC",
+    "muted": "#7C8894",
+    "line": "#2C343E",
+    "accent": "#5AA9E6",
+    "hot": "#F07167",
+    "row": "#232A33",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#54D49B",
+    "warning": "#F5A957",
+    "shadow": "#000000"
+  },
+  "pages": {
+    "home": {
+      "widgets": [
+        { "x": 16, "y": 16, "width": 448, "height": 120, "font": 0, "type": "rect", "color": "#1B222B" },
+        { "x": 32, "y": 32, "width": 400, "height": 30, "font": 2, "type": "text", "text": "MELODY", "color": "#5AA9E6" },
+        { "x": 32, "y": 72, "width": 400, "height": 22, "font": 1, "type": "text", "bind": "song", "color": "#F2F5F8" },
+        { "x": 32, "y": 98, "width": 400, "height": 18, "font": 0, "type": "text", "bind": "artist", "color": "#B8C2CC" },
+        { "x": 16, "y": 232, "width": 448, "height": 1, "font": 0, "type": "rect", "color": "#2C343E" }
+      ]
+    }
+  }
+}

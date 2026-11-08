@@ -100,6 +100,12 @@ void gfx_get_clip(int *x0, int *y0, int *x1, int *y1);
  * 所有函数的 y 都是「文字格子顶部」：12px 字占 y..y+12，16px 占 y..y+16。 */
 void gfx_text_init(void);
 int gfx_font_h(int fs);
+/* 主题自带字体：挂载后该字号优先使用它，缺字回退内置字库。
+ * blob 必须指向 PSPF v1 字库（校验由 skin_font.c 负责），生命周期由调用方管理。 */
+int gfx_theme_font_attach(int fs, const unsigned char *blob, const unsigned char *end);
+void gfx_theme_font_clear(void);
+int gfx_theme_font_ready(int fs);
+
 int gfx_text_w(int fs, const char *utf8);
 int gfx_text(int fs, int x, int y, const char *utf8, unsigned short color);
 int gfx_text_a(int fs, int x, int y, const char *utf8, unsigned short color, int alpha);

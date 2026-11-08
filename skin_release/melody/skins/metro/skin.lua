@@ -262,10 +262,16 @@ local function songs(t,m)
  for _,s in ipairs(m.songs or{})do if s.index>=first and shown<4 then songRow(78+shown*39,s,s.index==m.selected,m);shown=shown+1 end end;bar(m.download_select_mode==1 and selectionHint(m)or"○播放  △下载  L多选下载","←→快移  ×返回")
 end
 local function search(t,m)
- header("搜索",nil,m);ui.rect(17,63,444,30,"#FFFFFF");icon("search",26,70,16,"#151515");text(51,70,399,m.query~=""and m.query or"歌曲、歌手、歌单",0,"#333333")
+ header("搜索",nil,m);ui.rect(17,63,444,30,"#FFFFFF");icon("search",26,70,16,"#151515");local pre=(m.ime_active or 0)==1 and(m.ime_pre or"")or"";text(51,70,330,m.query~=""and m.query or"歌曲、歌手、歌单",0,"#333333");if pre~=""then local qw=ui.text_width(m.query or"",1);text(51+math.min(qw,300),70,300,pre,0,C.accent)end;if m.search_edit==1 then text(400,70,56,(m.ime_mode or 1)==2 and"假名"or"拼音",0,C.accent)end
  if m.search_edit==1 then
-  local chips={"周杰伦","林俊杰","邓紫棋","陈奕迅","薛之谦"};for i,v in ipairs(chips)do text(18+(i-1)*88,102,82,v,0,m.kb_row==-1 and m.kb_col==i-1 and C.accent or C.dim)end
-  local suggestions=m.suggestions or{};local start=math.floor(((m.suggest_selected or 1)-1)/4)*4;for slot=1,4 do local i=start+slot;if suggestions[i]then text(18+(slot-1)*112,123,106,suggestions[i],0,m.suggest_focused==1 and m.suggest_selected==i and C.accent or C.fg)end end
+  local cands=m.ime_candidates or{};local hist=m.search_history or{};local recs=m.search_chips or{}
+  if (m.ime_active or 0)==1 then
+   for i,v in ipairs(cands)do local x=17+(i-1)*72;local sel=m.kb_row<=-1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,68,20,C.accent)end;text(x+4,103,64,i.."."..v,0,sel and C.bg or C.fg)end
+  else
+   for i,v in ipairs(hist)do local x=17+(i-1)*96;local sel=m.kb_row==-1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,92,20,C.accent)end;text(x+5,103,84,"历史 "..v,0,sel and C.bg or C.dim)end
+  end
+  for i,v in ipairs(recs)do local x=17+(i-1)*96;local sel=m.kb_row==-2 and (m.chip_selected or 1)==i;if sel then ui.rect(x,119,92,20,C.accent)end;text(x+5,123,84,v,0,sel and C.bg or C.fg)end
+  local suggestions=m.suggestions or{};if (m.ime_active or 0)==0 then local start=math.floor(((m.suggest_selected or 1)-1)/4)*4;for slot=1,4 do local i=start+slot;if suggestions[i]then text(18+(slot-1)*112,123,106,suggestions[i],0,m.suggest_focused==1 and m.suggest_selected==i and C.accent or C.fg)end end end
   local letters={"qwertyuiop","asdfghjkl","zxcvbnm"};for r=0,2 do for col=0,(r<2 and 9 or 8)do
    local label=col<#letters[r+1]and string.sub(letters[r+1],col+1,col+1)or r==1 and"←"or col==7 and"空格"or"搜索"
    local x=17+col*45;local w=41;if r==2 and col==7 then w=76 elseif r==2 and col==8 then x=413;w=48 end

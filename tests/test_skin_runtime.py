@@ -128,7 +128,15 @@ if(argc==3&&!strcmp(argv[1],"--slow-device")){
  assert(skin_runtime_apply(argv[7],err,sizeof(err))==0);int result=skin_runtime_draw(SC_HOME,1,.016f);assert(result==0&&skin_runtime_error()[0]);assert(!skin_runtime_draw(SC_HOME,2,.016f));
  skin_runtime_reset();assert(!skin_runtime_active());puts("PASS production Lua runtime: palette, animated page, action bridge, declarative widgets, bad apply preserves active skin, infinite loop/heap limits, callback failure falls back");return 0;}
 '''
-(O/'test.c').write_text(code,encoding='utf-8');names=(R/'tools/prxloader/lua_sources.txt').read_text(encoding='ascii').splitlines();exe=O/'runtime.exe';cmd=['D:/msys64/ucrt64/bin/gcc.exe','-std=c99','-O1','-Wall','-Wextra','-Wno-misleading-indentation','-DLUA_32BITS','-DLUAI_MAXCCALLS=40','-I'+str(O),'-I'+str(R/'src'),'-I'+str(R/'third_party/lua-5.4.7'),O/'test.c',R/'src/skin_runtime.c',R/'src/json.c',*[R/n for n in names],'-lm','-o',exe]
+
+# 主题字体在宿主机测试里只需要桩：apply/release 走文件 I/O，不在本用例范围
+FONT_STUBS = r"""
+int skin_font_apply(const char *root){(void)root;return 0;}
+void skin_font_release(void){}
+int skin_font_bytes(void){return 0;}
+const char *skin_font_last_error(void){return "";}
+"""
+(O/'test.c').write_text(code+FONT_STUBS,encoding='utf-8');names=(R/'tools/prxloader/lua_sources.txt').read_text(encoding='ascii').splitlines();exe=O/'runtime.exe';cmd=['D:/msys64/ucrt64/bin/gcc.exe','-std=c99','-O1','-Wall','-Wextra','-Wno-misleading-indentation','-DLUA_32BITS','-DLUAI_MAXCCALLS=40','-I'+str(O),'-I'+str(R/'src'),'-I'+str(R/'third_party/lua-5.4.7'),O/'test.c',R/'src/skin_runtime.c',R/'src/json.c',R/'src/ime.c',R/'src/search_history.c',*[R/n for n in names],'-lm','-o',exe]
 subprocess.run(cmd,cwd=R,check=True,timeout=90)
 with tempfile.TemporaryDirectory(prefix='melody-skin-runtime-')as td:
  p=Path(td);args=[R/'skin_release/melody/skins/ocean',R/'skin_release/melody/skins/metro']

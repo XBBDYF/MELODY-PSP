@@ -38,6 +38,9 @@
 #include "ui.h"
 #include "skin_runtime.h"
 #include "skin_options_ui.h"
+#include "ime.h"
+#include "search_history.h"
+#include "search_chips.h"
 #include "update_gallery.h"
 #include "skin_transition.h"
 #include "skin_sound.h"
@@ -1757,9 +1760,13 @@ static int kb_cols(int row)
     return 9;
 }
 
+static void search_refresh_chips(void);
+
 static void search_do(const char *q)
 {
     if (!q[0]) { ui_toast("先输入拼音"); return; }
+    if (search_hist_push(q)) store_save();
+    search_refresh_chips();
 
     g_app.search_state = 1;
     g_app.kb_edit = 0;
@@ -1777,6 +1784,28 @@ static void search_do(const char *q)
             g_app.hist_n++;
         }
     }
+}
+
+/* 推荐搜索：优先最近播放的歌手，其次收藏，最后内置兜底。
+ * 结果写进 g_app.chips，ui.c 只读。 */
+static void search_refresh_chips(void)
+{
+    const char *recent[APP_CHIP_MAX * 2];
+    const char *fav[APP_CHIP_MAX * 2];
+    int rn = 0, fn = 0;
+
+    for (int i = 0; i < store_recent_count() && rn < (int)(sizeof(recent) / sizeof(recent[0])); ++i) {
+        const Song *s = store_recent_get(i);
+
+        if (s && s->artist[0]) recent[rn++] = s->artist;
+    }
+    for (int i = 0; i < store_fav_count() && fn < (int)(sizeof(fav) / sizeof(fav[0])); ++i) {
+        const Song *s = store_fav(i);
+
+        if (s && s->artist[0]) fav[fn++] = s->artist;
+    }
+    g_app.chips_n = search_chips_build(recent, rn, fav, fn, g_app.chips, APP_CHIP_MAX);
+    if (g_app.chip_sel >= g_app.chips_n) g_app.chip_sel = 0;
 }
 
 static void query_append(const char *s)
@@ -1803,14 +1832,14 @@ static void query_backspace(void)
 
 static void input_search(unsigned int pressed, unsigned int held, float dt)
 {
-    static const char *chip_q[5] = { "zhoujielun", "linjunjie", "dengziqi",
-                                     "chenyixun", "xuezhiqian" };
     static const char *kb0 = "qwertyuiop";
     static const char *kb1 = "asdfghjkl";
     static const char *kb2 = "zxcvbnm";
 
     g_app.tab = 2;
-    if(pressed&(PSP_CTRL_LTRIGGER|PSP_CTRL_RTRIGGER)){
+
+    /* 结果态才用 L/R 切分类；输入态留给输入法选词 */
+    if(!g_app.kb_edit && pressed&(PSP_CTRL_LTRIGGER|PSP_CTRL_RTRIGGER)){
         int direction=(pressed&PSP_CTRL_RTRIGGER)?1:4;g_app.search_kind=(g_app.search_kind+direction)%5;g_app.list_sel=0;g_app.list_scroll=0;
         if(g_app.query[0])search_do(g_app.query);else ui_toast(api_search_category_name(g_app.search_kind));return;
     }
@@ -1849,33 +1878,52 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
             g_app.kb_edit = 1;
             g_app.sug_focus = 0;
             g_app.sug_t = 0;
+            ime_reset();
         }
         if (pressed & PSP_CTRL_CROSS) set_screen(SC_HOME);
         if (pressed & PSP_CTRL_SELECT) {
             g_app.query[0] = 0;
             g_app.query_len = 0;
             g_app.kb_edit = 1;
+            ime_reset();
         }
         return;
     }
 
-    /* ---- 输入中：防抖 0.45 秒后去要联想候选 ---- */
-    if (strcmp(g_app.query, g_app.sug_last)) {
-        g_app.sug_t += dt;
-        if (g_app.sug_t > 0.45f) {
-            g_app.sug_t = 0;
-            snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
-            if (g_app.query[0]) {
-                g_app.sug_state = 1;
-                g_app.sug_sel = 0;
-                api_request_suggest(g_app.query);
-            } else {
-                g_app.sug_state = 0;
-            }
+    /* ---------------- 输入模式 ---------------- */
+    if (g_app.chips_n == 0) search_refresh_chips();
+
+    if (pressed & PSP_CTRL_SQUARE) {
+        ime_toggle_mode();
+        ui_toast(ime_mode() == IME_KANA ? "输入法：假名（罗马字）" : "输入法：拼音");
+        g_app.ime_sel = 0;
+        return;
+    }
+    if (pressed & PSP_CTRL_SELECT) {
+        g_app.query[0] = 0;
+        g_app.query_len = 0;
+        ime_reset();
+        g_app.ime_sel = 0;
+        return;
+    }
+    if (pressed & PSP_CTRL_CROSS) {
+        ime_reset();
+        set_screen(SC_HOME);
+        return;
+    }
+    if (pressed & PSP_CTRL_TRIANGLE) {
+        if (ime_active()) {
+            ime_backspace();
+            return;
         }
+        if (api_suggest_count() > 0) {
+            g_app.sug_focus = 1;
+            if (g_app.sug_sel >= api_suggest_count()) g_app.sug_sel = 0;
+        }
+        return;
     }
 
-    /* ---- 右侧联想面板获得焦点：上下选，○ 采用 ---- */
+    /* 联想面板焦点（沿用旧逻辑） */
     if (g_app.sug_focus) {
         int n = api_suggest_count();
 
@@ -1884,61 +1932,89 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
             return;
         }
         if (n > 0) {
-            /* 四格窗口随选择翻动；所有已取得候选均可用 ←→ 选择。 */
-            {
-                int sn = n;
+            int sn = n;
 
-                if (g_app.sug_sel >= sn) g_app.sug_sel = 0;
-                if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT))
-                    g_app.sug_sel = (g_app.sug_sel + sn - 1) % sn;
-                if (btn_repeat(pressed, held, dt, PSP_CTRL_RIGHT))
-                    g_app.sug_sel = (g_app.sug_sel + 1) % sn;
-                if (btn_repeat(pressed, held, dt, PSP_CTRL_UP) ||
-                    btn_repeat(pressed, held, dt, PSP_CTRL_DOWN))
-                    g_app.sug_focus = 0;
-                if (pressed & PSP_CTRL_CIRCLE) {
-                    snprintf(g_app.query, sizeof(g_app.query), "%s", api_suggest(g_app.sug_sel));
-                    g_app.query_len = (int)strlen(g_app.query);
-                    snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
-                    g_app.sug_focus = 0;
-                    mlog("suggest pick: %s", g_app.query);
-                    search_do(g_app.query);
-                }
+            if (g_app.sug_sel >= sn) g_app.sug_sel = 0;
+            if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT))
+                g_app.sug_sel = (g_app.sug_sel + sn - 1) % sn;
+            if (btn_repeat(pressed, held, dt, PSP_CTRL_RIGHT))
+                g_app.sug_sel = (g_app.sug_sel + 1) % sn;
+            if (btn_repeat(pressed, held, dt, PSP_CTRL_UP) ||
+                btn_repeat(pressed, held, dt, PSP_CTRL_DOWN))
+                g_app.sug_focus = 0;
+            if (pressed & PSP_CTRL_CIRCLE) {
+                snprintf(g_app.query, sizeof(g_app.query), "%s", api_suggest(g_app.sug_sel));
+                g_app.query_len = (int)strlen(g_app.query);
+                snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
+                g_app.sug_focus = 0;
+                mlog("suggest pick: %s", g_app.query);
+                search_do(g_app.query);
             }
         }
         return;
     }
 
-    /* ---- 键盘 ---- */
-    if (pressed & PSP_CTRL_CROSS) set_screen(SC_HOME);
-    if (pressed & PSP_CTRL_SELECT) {
-        g_app.query[0] = 0;
-        g_app.query_len = 0;
-    }
-    if ((pressed & PSP_CTRL_TRIANGLE) && api_suggest_count() > 0) {
-        g_app.sug_focus = 1;
-        if (g_app.sug_sel >= api_suggest_count()) g_app.sug_sel = 0;
-        return;
-    }
+    /* 两行 chip 区：-1 = 候选/历史，-2 = 推荐 */
+    if (g_app.kb_row <= -1) {
+        int ime = ime_active();
+        int cand_n = ime ? ime_candidate_count() : 0;
+        int row1_n = ime ? cand_n : search_hist_count();
+        int is_row2 = (g_app.kb_row == -2);
 
-    if (g_app.kb_row == -1) {
+        if (ime) g_app.chip_sel = 0;
+
         if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT)) {
-            g_app.kb_col = (g_app.kb_col + 4) % 5;
+            if (is_row2) {
+                if (g_app.chip_sel > 0) g_app.chip_sel--;
+            } else if (ime) {
+                if (g_app.ime_sel > 0) g_app.ime_sel--;
+            } else if (g_app.chip_sel > 0) {
+                g_app.chip_sel--;
+            }
         }
         if (btn_repeat(pressed, held, dt, PSP_CTRL_RIGHT)) {
-            g_app.kb_col = (g_app.kb_col + 1) % 5;
+            if (is_row2) {
+                if (g_app.chip_sel + 1 < g_app.chips_n) g_app.chip_sel++;
+            } else if (ime) {
+                if (g_app.ime_sel + 1 < cand_n) g_app.ime_sel++;
+            } else if (g_app.chip_sel + 1 < row1_n) {
+                g_app.chip_sel++;
+            }
         }
-        if (pressed & PSP_CTRL_DOWN) {
-            g_app.kb_row = 0;
-            if (g_app.kb_col > 9) g_app.kb_col = 9;
+        if (btn_repeat(pressed, held, dt, PSP_CTRL_UP)) {
+            if (!is_row2) g_app.kb_row = -2;
+        }
+        if (btn_repeat(pressed, held, dt, PSP_CTRL_DOWN)) {
+            g_app.kb_row = is_row2 ? -1 : 0;
+            if (!is_row2 && g_app.kb_col > 9) g_app.kb_col = 9;
         }
         if (pressed & PSP_CTRL_CIRCLE) {
-            search_do(chip_q[g_app.kb_col]);
-            return;
+            char out[64];
+
+            if (ime && !is_row2) {
+                if (ime_select(g_app.ime_sel, out, (int)sizeof(out)) > 0) {
+                    query_append(out);
+                    g_app.ime_sel = 0;
+                    mlog("ime commit: %s", out);
+                }
+            } else if (!is_row2) {
+                const char *q = search_hist_at(g_app.chip_sel);
+
+                if (q[0]) {
+                    snprintf(g_app.query, sizeof(g_app.query), "%s", q);
+                    g_app.query_len = (int)strlen(g_app.query);
+                    search_do(g_app.query);
+                }
+            } else if (g_app.chips_n > 0) {
+                snprintf(g_app.query, sizeof(g_app.query), "%s", g_app.chips[g_app.chip_sel]);
+                g_app.query_len = (int)strlen(g_app.query);
+                search_do(g_app.query);
+            }
         }
         return;
     }
 
+    /* 键盘：字母先给输入法 */
     if (btn_repeat(pressed, held, dt, PSP_CTRL_LEFT)) {
         g_app.kb_col--;
         if (g_app.kb_col < 0) g_app.kb_col = kb_cols(g_app.kb_row) - 1;
@@ -1948,10 +2024,12 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
         if (g_app.kb_col >= kb_cols(g_app.kb_row)) g_app.kb_col = 0;
     }
     if (btn_repeat(pressed, held, dt, PSP_CTRL_UP)) {
-        g_app.kb_row--;
-        if (g_app.kb_row < -1) g_app.kb_row = -1;
-        if (g_app.kb_col >= (g_app.kb_row == -1 ? 5 : kb_cols(g_app.kb_row)))
-            g_app.kb_col = (g_app.kb_row == -1 ? 5 : kb_cols(g_app.kb_row)) - 1;
+        int top = g_app.chips_n > 0 ? -2 : -1;
+
+        if (g_app.kb_row <= 0) g_app.kb_row = top;
+        else g_app.kb_row--;
+        if (g_app.kb_col >= (g_app.kb_row <= -1 ? 9 : kb_cols(g_app.kb_row)))
+            g_app.kb_col = (g_app.kb_row <= -1 ? 9 : kb_cols(g_app.kb_row)) - 1;
     }
     if (btn_repeat(pressed, held, dt, PSP_CTRL_DOWN)) {
         g_app.kb_row++;
@@ -1962,17 +2040,52 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
     if (pressed & PSP_CTRL_CIRCLE) {
         int row = g_app.kb_row, col = g_app.kb_col;
 
-        if (row == 0) { char s[2] = { kb0[col], 0 }; query_append(s); }
-        else if (row == 1) {
-            if (col < 9) { char s[2] = { kb1[col], 0 }; query_append(s); }
-            else query_backspace();
+        if (row == 0) {
+            char ch = kb0[col];
+
+            if (ime_feed(ch)) query_append(ime_last_commit());
+        } else if (row == 1) {
+            if (col < 9) {
+                char ch = kb1[col];
+
+                if (ime_feed(ch)) query_append(ime_last_commit());
+            } else if (ime_active()) {
+                ime_backspace();
+            } else {
+                query_backspace();
+            }
         } else {
-            if (col < 7) { char s[2] = { kb2[col], 0 }; query_append(s); }
-            else if (col == 7) query_append(" ");
-            else search_do(g_app.query);
+            if (col < 7) {
+                char ch = kb2[col];
+
+                if (ime_feed(ch)) query_append(ime_last_commit());
+            } else if (col == 7) {
+                if (ime_active()) {
+                    char out[64];
+
+                    if (ime_candidate_count() > 0 &&
+                        ime_select(g_app.ime_sel, out, (int)sizeof(out)) > 0)
+                        query_append(out);
+                    else if (ime_commit_raw(out, (int)sizeof(out)) > 0)
+                        query_append(out);
+                } else {
+                    query_append(" ");
+                }
+            } else {
+                if (ime_active()) {
+                    char out[64];
+
+                    if (ime_candidate_count() > 0 &&
+                        ime_select(g_app.ime_sel, out, (int)sizeof(out)) > 0)
+                        query_append(out);
+                } else {
+                    search_do(g_app.query);
+                }
+            }
         }
     }
 }
+
 /* ---- 封面网格 ---- */
 static void grid_open(int idx)
 {

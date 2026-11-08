@@ -5,7 +5,7 @@ R=Path(__file__).resolve().parents[2];
 from verify_skin_release import verify_prx,verify_update
 # Rebuild all linked application objects, including consent/config and assets.
 linked=re.findall(r'\$SRC/([a-zA-Z0-9_]+\.o)',(R/'tools/prxloader/build.sh').read_text(encoding='utf-8'));subprocess.run(['D:/msys64/usr/bin/bash.exe','build.sh']+['src/'+n for n in linked],cwd=R,check=True)
-subprocess.run(['D:/msys64/usr/bin/bash.exe','build.sh','src/prx_entry.o','src/log.o','src/local.o','src/main.o','src/ui.o','src/gfx.o','src/gfx_gu.o','src/store.o','src/api.o','src/net.o','src/audio.o','src/dl.o','src/cache.o','src/mv.o','src/skin_runtime.o','src/skin_disc.o','src/lyric_motion.o','src/lyric_render.o','src/update_gallery.o','src/skin_music_fx.o','src/skin_wave.o','src/skin_options.o','src/skin_options_ui.o','src/skin_transition.o','src/skin_page_turn.o','src/skin_catalog.o'],cwd=R,check=True)
+subprocess.run(['D:/msys64/usr/bin/bash.exe','build.sh','src/prx_entry.o','src/log.o','src/local.o','src/main.o','src/ui.o','src/gfx.o','src/gfx_gu.o','src/store.o','src/api.o','src/net.o','src/audio.o','src/dl.o','src/cache.o','src/mv.o','src/skin_runtime.o','src/skin_disc.o','src/lyric_motion.o','src/lyric_render.o','src/update_gallery.o','src/skin_music_fx.o','src/skin_wave.o','src/skin_options.o','src/skin_options_ui.o','src/skin_transition.o','src/skin_page_turn.o','src/skin_catalog.o','src/ime.o','src/search_history.o','src/search_chips.o','src/skin_font.o'],cwd=R,check=True)
 subprocess.run(['D:/msys64/usr/bin/bash.exe','tools/prxloader/build.sh'],cwd=R,check=True)
 verify_prx((R/'tools/prxloader/melody.prx').read_bytes())
 version=sys.argv[1];assert re.fullmatch(r'(3\.4\.[1234]|3\.5\.0|5\.0|4\.1\.1|4\.1|4\.0|4\.0\.1|3\.9)',version)

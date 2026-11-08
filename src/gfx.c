@@ -86,6 +86,8 @@ static int gu_ready(void){
 }
 
 static Font g_fonts[FS_COUNT];
+/* 主题自带字体：声明过的字号优先用它，缺字再回退内置。 */
+static Font g_theme_fonts[FS_COUNT];
 
 /* 姣忎釜瀛楀彿涓€琛屽崰鐨勯珮搴︼紙涔熸槸瀛楀簱鏍煎瓙鐨勯珮搴︼級 */
 static const int g_line_h[FS_COUNT] = { 12, 16, 22, 32 };
@@ -1081,12 +1083,34 @@ int gfx_font_h(int fs)
 }
 
 /* 鍙栧瓧褰細鎸夊瓧鍙烽摼閫愮骇閫€鍥烇紱杩斿洖鏃?dy 鏄瀭鐩村眳涓亸绉?*/
+int gfx_theme_font_attach(int fs, const unsigned char *blob, const unsigned char *end)
+{
+    if (fs < 0 || fs >= FS_COUNT || !blob || !end || end <= blob) return -1;
+    memset(&g_theme_fonts[fs], 0, sizeof(g_theme_fonts[fs]));
+    return font_load(&g_theme_fonts[fs], blob, end, g_line_h[fs]);
+}
+
+void gfx_theme_font_clear(void)
+{
+    memset(g_theme_fonts, 0, sizeof(g_theme_fonts));
+}
+
+int gfx_theme_font_ready(int fs)
+{
+    if (fs < 0 || fs >= FS_COUNT) return 0;
+    return g_theme_fonts[fs].ready;
+}
+
 static int pick_glyph(int fs, unsigned int cp, Glyph *g, int *dy)
 {
     int i;
 
     if (fs < 0 || fs >= FS_COUNT) fs = FS_MD;
 
+    if (g_theme_fonts[fs].ready && find_glyph(&g_theme_fonts[fs], cp, g)) {
+        *dy = (g_line_h[fs] - g->h) / 2;
+        return 1;
+    }
     for (i = 0; i < 4 && g_chain[fs][i] >= 0; ++i) {
         int fi = g_chain[fs][i];
         if (find_glyph(&g_fonts[fi], cp, g)) {

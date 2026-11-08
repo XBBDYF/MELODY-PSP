@@ -179,6 +179,8 @@ enum {
 #define HOME_ITEM_COVER  4
 #define HOME_ITEM_QUICK  14
 #define HOME_ITEM_COUNT  19
+#define APP_CHIP_MAX      6    /* 搜索页：推荐搜索最多几个 */
+#define APP_CHIP_LEN      24
 #define HOME_COVERS      10
 #define HOME_QUICKS      5
 
@@ -232,6 +234,12 @@ typedef struct {
     int search_kind;     /* 0 空 / 1 搜索中 / 2 有结果 / 3 失败 */
     char hist[6][40];
     int hist_n;
+    /* 搜索页：推荐/历史 chip 与输入法候选（ui.c 只读） */
+    char chips[APP_CHIP_MAX][APP_CHIP_LEN];
+    int chips_n;
+    int chip_sel;          /* 当前选中的 chip（0 起） */
+    int chip_row;          /* 0 = 第一行(历史/候选)，1 = 推荐行 */
+    int ime_sel;           /* 候选序号（0 起） */
 
     /* 搜索联想 */
     int sug_focus;       /* 1 = 光标在右侧联想列表里 */

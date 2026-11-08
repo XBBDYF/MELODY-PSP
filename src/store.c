@@ -1,6 +1,7 @@
 #include "store.h"
 
 #include "log.h"
+#include "search_history.h"
 
 #include <pspkernel.h>
 #include <pspiofilemgr.h>
@@ -104,6 +105,9 @@ void store_init(void)
 
             if (parts >= 2 && parts <= 6) g_dl_parts = parts;
         }
+        else if (kind == 'H') {
+            search_hist_push(f[1]);          /* 文件里的顺序就是新→旧 */
+        }
     }
 
     fclose(fp);
@@ -129,6 +133,19 @@ void store_save(void)
         clean_field(a);
         fprintf(fp, "R|%lld|%d|%s|%s|%d\n", g_recent[i].id, g_recent[i].dur_ms,
                 n, a, g_recent[i].mv);
+    }
+    {
+        char hist[SEARCH_HIST_MAX][SEARCH_HIST_LEN];
+        int n = search_hist_export(hist, SEARCH_HIST_MAX);
+
+        for (int i = 0; i < n; ++i) {
+            char q[SEARCH_HIST_LEN];
+
+            memcpy(q, hist[i], sizeof(q));
+            q[sizeof(q) - 1] = 0;
+            clean_field(q);
+            if (q[0]) fprintf(fp, "H|%s\n", q);
+        }
     }
     for (int i = 0; i < g_fav_n; ++i) {
         char n[80], a[80];

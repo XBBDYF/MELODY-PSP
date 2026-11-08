@@ -14,6 +14,8 @@
  */
 
 #include "ui.h"
+#include "ime.h"
+#include "search_history.h"
 
 #include "api.h"
 #include "lyric_motion.h"
@@ -1890,6 +1892,27 @@ static const char *kb_col_label(int row, int col)
     return "搜索";
 }
 
+static void search_chip_row(int y, const char *label, int row, int count,
+                           const char *const *items, int selected, int ime_mode)
+{
+    int x = 15;
+
+    (void)ime_mode;
+    if (label) {
+        gfx_text(FS_SM, 15, y + 5, label, C_MUTE);
+        x = 15 + gfx_text_w(FS_SM, label) + 8;
+    }
+    for (int i = 0; i < count; ++i) {
+        int w = 88, kx = x + i * (w + 4);
+        int sel = (g_app.kb_row == row && selected == i);
+
+        if (kx + w > SCR_W - 10) break;
+        gfx_fill_round(kx, y, w, 20, 10, sel ? C_ACC : C_PANEL2);
+        if (!sel) gfx_round_border_a(kx, y, w, 20, 10, C_LINE, 160);
+        gfx_text_ellipsis(FS_SM, kx + 7, y + 4, w - 12, items[i], sel ? C_WHITE : C_SUB);
+    }
+}
+
 static void screen_search(float t, float dt)
 {
     char right[40];
@@ -1903,26 +1926,39 @@ static void screen_search(float t, float dt)
     nav_page("搜索", right, 1);
     if(!g_app.kb_edit)for(int kind=0;kind<5;++kind){int x=18+kind*92;gfx_text(FS_SM,x,63,api_search_category_name(kind),kind==g_app.search_kind?C_ACC:C_MUTE);if(kind==g_app.search_kind)gfx_fill_rect(x,78,38,2,C_ACC);}
 
-    /* 搜索框 */
+    /* 搜索框：已上屏文本 + 输入法 preedit（强调色）+ 模式角标 */
     {
         int x = 12, y = 34, w = SCR_W - 24, h = 30;
         int focused = g_app.kb_edit;
+        int ime = focused && ime_active();
+        const char *pre = ime ? ime_preedit() : "";
 
         gfx_fill_round(x, y, w, h, 15, C_PANEL2);
         gfx_round_border(x, y, w, h, 15, focused ? C_ACC : C_LINE);
         icon_search(x + 18, y + 15, 6, focused ? C_ACC : C_MUTE, 230);
 
-        if (g_app.query_len > 0) {
-            gfx_text(FS_MD, x + 34, y + 7, g_app.query, C_TXT);
-            if (focused && ((int)(t * 2.0f) & 1)) {
-                int cx = x + 34 + gfx_text_w(FS_MD, g_app.query);
-                gfx_fill_rect(cx + 1, y + 7, 2, 16, C_ACC);
+        if (g_app.query_len > 0 || pre[0]) {
+            int tx = x + 34;
+            int qw = gfx_text_w(FS_MD, g_app.query);
+
+            if (g_app.query_len > 0) gfx_text(FS_MD, tx, y + 7, g_app.query, C_TXT);
+            if (pre[0]) {
+                gfx_text(FS_MD, tx + qw, y + 7, pre, C_ACC);
+                if (focused && ((int)(t * 2.0f) & 1))
+                    gfx_fill_rect(tx + qw + gfx_text_w(FS_MD, pre) + 1, y + 7, 2, 16, C_ACC);
+            } else if (focused && ((int)(t * 2.0f) & 1)) {
+                gfx_fill_rect(tx + qw + 1, y + 7, 2, 16, C_ACC);
             }
         } else {
-            gfx_text(FS_SM, x + 34, y + 9, "搜索歌曲、歌手（输入拼音）", C_MUTE);
+            gfx_text(FS_SM, x + 34, y + 9, "搜歌曲/歌手/歌单（拼音或假名）", C_MUTE);
         }
+        if (focused) {
+            const char *mode = ime_mode() == IME_KANA ? "假名" : "拼音";
+            int mw = gfx_text_w(FS_SM, mode);
 
-        if (g_app.query_len > 0) {
+            gfx_fill_round(x + w - mw - 22, y + 8, mw + 14, 15, 7, C_ACC);
+            gfx_text(FS_SM, x + w - mw - 15, y + 9, mode, C_WHITE);
+        } else if (g_app.query_len > 0) {
             gfx_circle_a(x + w - 16, y + h / 2, 8, C_MUTE, 200);
             gfx_text_center(FS_SM, x + w - 24, 16, y + h / 2 - 6, "×", C_WHITE);
         }
@@ -1937,27 +1973,48 @@ static void screen_search(float t, float dt)
     }
 
     if (g_app.kb_edit) {
-        /* 常用歌手 */
-        for (int i = 0; i < 5; ++i) {
-            int w = 82, x = 23 + i * 88, y = 68;
-            int sel = (g_app.kb_row == -1 && g_app.kb_col == i);
+        int ime = ime_active();
+        int ime_n = ime ? ime_candidate_count() : 0;
 
-            gfx_fill_round(x, y, w, 22, 11, sel ? C_ACC : C_PANEL2);
-            if (!sel) gfx_round_border_a(x, y, w, 22, 11, C_LINE, 160);
-            gfx_text_center(FS_SM, x, w, y + 5, g_chips[i], sel ? C_WHITE : C_SUB);
+        /* 第一行：输入法候选（优先）或搜索历史 */
+        if (ime_n > 0) {
+            int n = ime_n > 6 ? 6 : ime_n;
+
+            for (int i = 0; i < n; ++i) {
+                char tag[40];
+                int x = 15 + i * 76, y = 68, w = 72;
+                int sel = (g_app.kb_row == -1 && g_app.ime_sel == i);
+
+                snprintf(tag, sizeof(tag), "%d.%s", i + 1, ime_candidate(i));
+                gfx_fill_round(x, y, w, 20, 10, sel ? C_ACC : C_PANEL2);
+                if (!sel) gfx_round_border_a(x, y, w, 20, 10, C_LINE, 160);
+                gfx_text_ellipsis(FS_SM, x + 6, y + 4, w - 10, tag, sel ? C_WHITE : C_TXT);
+            }
+        } else {
+            int hn = search_hist_count();
+
+            for (int i = 0; i < hn && i < 4; ++i) {
+                char tag[40];
+                int x = 15 + i * 96, y = 68, w = 92;
+                int sel = (g_app.kb_row == -1 && g_app.chip_sel == i);
+
+                snprintf(tag, sizeof(tag), "历史 %s", search_hist_at(i));
+                gfx_fill_round(x, y, w, 20, 10, sel ? C_ACC : C_PANEL2);
+                if (!sel) gfx_round_border_a(x, y, w, 20, 10, C_LINE, 150);
+                gfx_text_ellipsis(FS_SM, x + 6, y + 4, w - 10, tag, sel ? C_WHITE : C_SUB);
+            }
+            if (hn == 0) gfx_text(FS_SM, 16, 73, "历史为空，按 □ 切换输入法", C_MUTE);
         }
 
-        /* 联想候选：一条横带，不挡键盘 */
+        /* 第二行：联想候选（有的话）否则推荐搜索 */
         {
             int n = api_suggest_count();
-            int first = g_app.sug_focus ? (g_app.sug_sel / 4) * 4 : 0;
-            int rows;
-            if (first >= n) first = 0;
-            rows = n - first;
-            if (rows > 4) rows = 4;
 
-            if (rows > 0) {
-                for (int i = 0; i < rows; ++i) {
+            if (n > 0 && !ime) {
+                int first = g_app.sug_focus ? (g_app.sug_sel / 4) * 4 : 0;
+
+                if (first >= n) first = 0;
+                for (int i = 0; i < 4 && first + i < n; ++i) {
                     int x = 15 + i * 114, y = 94, w = 108;
                     int sel = (g_app.sug_focus && first + i == g_app.sug_sel);
 
@@ -1966,9 +2023,11 @@ static void screen_search(float t, float dt)
                     gfx_text_ellipsis(FS_SM, x + 7, y + 4, w - 12, api_suggest(first + i),
                                       sel ? C_WHITE : C_TXT);
                 }
-            } else if (g_app.query[0]) {
-                gfx_text(FS_SM, 16, 97, g_app.sug_state == 1 ? "联想中..." : "按 △ 看联想",
-                         C_MUTE);
+            } else if (g_app.chips_n > 0) {
+                const char *items[APP_CHIP_MAX];
+
+                for (int i = 0; i < g_app.chips_n; ++i) items[i] = g_app.chips[i];
+                search_chip_row(94, "推荐", -2, g_app.chips_n, items, g_app.chip_sel, ime_mode());
             }
         }
 
@@ -2002,10 +2061,11 @@ static void screen_search(float t, float dt)
         }
 
         {
-            const char *tip = "↑↓←→ 选键 · ○ 输入 · △ 联想 · × 返回";
+            const char *tip = ime_n > 0 ? "○ 上屏 · △ 删字母 · □ 中/日 · ←→ 选词"
+                                        : "↑↓←→ 选键 · ○ 确认 · △ 联想 · □ 中/日";
 
             if (g_app.search_state == 1) tip = "正在搜索 ...";
-            else if (g_app.search_state == 3) tip = "没有结果，换个拼音试试";
+            else if (g_app.search_state == 3) tip = "没有结果，换个拼音/假名试试";
 
             gfx_text_center(FS_SM, 0, SCR_W, 205, tip,
                             g_app.search_state == 3 ? C_WARN : C_MUTE);
@@ -2020,7 +2080,7 @@ static void screen_search(float t, float dt)
             spinner_draw(SCR_W / 2, 146, g_app.spinner);
         } else if (g_list.count == 0) {
             gfx_text_center(FS_MD, 0, SCR_W, 112, "没有找到歌曲", C_SUB);
-            gfx_text_center(FS_SM, 0, SCR_W, 136, "试试输入歌手的全拼，比如 zhoujielun", C_MUTE);
+            gfx_text_center(FS_SM, 0, SCR_W, 136, "试试输入全拼（如 zhoujielun）或假名", C_MUTE);
         }
 
         gfx_set_clip(0, top, SCR_W, content_bottom());
@@ -2036,26 +2096,19 @@ static void screen_search(float t, float dt)
         gfx_reset_clip();
 
         if (g_app.list_more)
-            gfx_text_center(FS_SM, 0, SCR_W, content_bottom() - 16, "加载中...", C_MUTE);
+            gfx_text_center(FS_SM, 0, SCR_W, content_bottom() - 16, "加载中 ...", C_MUTE);
 
         scrollbar_draw(top, view_h, g_list.count, view_h / row_h + 1,
                        (int)g_app.list_scroll / row_h);
-    }
 
-    hint_begin();
-    hint_item("L/R","分类");
-    if (g_app.kb_edit) {
-        hint_item("○", "输入");
-        hint_item("△", "联想");
-        hint_item("×", "返回");
-        hint_item("SELECT", "清空");
-    } else {
+        hint_begin();
+        hint_item("L/R", "分类");
         hint_item("○", "播放");
-        hint_item("□", "下载");
         hint_item("△", "改搜索");
-        hint_item("×", "返回");
+        hint_item("□", "下载");
+        hint_item("SELECT", "输入法");
+        hint_end();
     }
-    hint_end();
 }
 
 /* ==== PART4 ==== */

@@ -189,13 +189,18 @@ end
 
 local function xmbSearch(t,m)
  header("搜索",nil,m)
- icon("search",24,67,15,C.dim);text(50,65,402,(m.query and m.query~="")and m.query or"歌曲、歌手、歌单",1,C.fg)
+ icon("search",24,67,15,C.dim);local pre=(m.ime_active or 0)==1 and(m.ime_pre or"")or"";text(50,65,330,(m.query and m.query~="")and m.query or"歌曲、歌手、歌单",1,C.fg);if pre~=""then text(50+math.min(ui.text_width(m.query or"",1),300),65,300,pre,0,C.accent)end;if m.search_edit==1 then text(400,65,56,(m.ime_mode or 1)==2 and"假名"or"拼音",0,C.accent)end
  ui.rect(24,90,432,1,C.line)
  if m.search_edit==1 then
-  local chips={"周杰伦","林俊杰","邓紫棋","陈奕迅","薛之谦"}
-  for i,v in ipairs(chips)do text(18+(i-1)*88,102,82,v,0,m.kb_row==-1 and m.kb_col==i-1 and C.accent or C.fg)end
+  local cands=m.ime_candidates or{};local hist=m.search_history or{};local recs=m.search_chips or{}
+  if (m.ime_active or 0)==1 then
+   for i,v in ipairs(cands)do local x=17+(i-1)*72;local sel=m.kb_row<=-1 and (m.ime_selected or 1)==i;if sel then ui.rect(x,99,68,20,C.accent)end;text(x+4,103,64,i.."."..v,0,sel and C.bg or C.fg)end
+  else
+   for i,v in ipairs(hist)do local x=17+(i-1)*96;local sel=m.kb_row==-1 and (m.chip_selected or 1)==i;if sel then ui.rect(x,99,92,20,C.accent)end;text(x+5,103,84,"历史 "..v,0,sel and C.bg or C.dim)end
+  end
+  for i,v in ipairs(recs)do local x=17+(i-1)*96;local sel=m.kb_row==-2 and (m.chip_selected or 1)==i;if sel then ui.rect(x,119,92,20,C.accent)end;text(x+5,123,84,v,0,sel and C.bg or C.fg)end
   local suggestions=m.suggestions or{};local start=math.floor(((m.suggest_selected or 1)-1)/4)*4
-  for slot=1,4 do local i=start+slot;if suggestions[i]then text(18+(slot-1)*112,123,106,suggestions[i],0,m.suggest_focused==1 and m.suggest_selected==i and C.accent or C.fg)end end
+  if (m.ime_active or 0)==0 then for slot=1,4 do local i=start+slot;if suggestions[i]then text(18+(slot-1)*112,123,106,suggestions[i],0,m.suggest_focused==1 and m.suggest_selected==i and C.accent or C.fg)end end end
   -- Native input_search rows: 10 / 10 / 9 cells, including delete/space/search.
   local letters={"qwertyuiop","asdfghjkl","zxcvbnm"}
   for r=0,2 do for col=0,(r<2 and 9 or 8)do

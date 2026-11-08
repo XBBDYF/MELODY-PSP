@@ -15,6 +15,7 @@ prefix = r'''
 #include <string.h>
 #include <assert.h>
 #include "app.h"
+#include "search_history.h"
 #include "settings_order.h"
 #undef APP_DIR
 #define APP_DIR ""
@@ -67,7 +68,7 @@ int main(void) {
 '''
 (OUT / "test.c").write_text(prefix + actual + tail, encoding="utf-8")
 exe = OUT / "test.exe"
-subprocess.run(["D:/msys64/ucrt64/bin/gcc.exe", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-I" + str(ROOT / "src"), str(OUT / "test.c"), "-o", str(exe)], check=True)
+subprocess.run(["D:/msys64/ucrt64/bin/gcc.exe", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-I" + str(ROOT / "src"), str(OUT / "test.c"), str(ROOT / "src/search_history.c"), "-o", str(exe)], check=True)
 subprocess.run([str(exe)], cwd=OUT, check=True)
 main = (ROOT / "src/main.c").read_text(encoding="utf-8")
 ui = (ROOT / "src/ui.c").read_text(encoding="utf-8")

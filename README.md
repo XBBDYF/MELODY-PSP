@@ -560,9 +560,6 @@ MELODY 以 **GNU General Public License v3.0** 发布，见 [LICENSE](LICENSE)�
 > 打赏不会解锁任何功能，也不是使用本程序的前提；它只用来支付服务器与后续开发的成本。
 
 <p align="center">
-  <img src="docs/assets/qq-group.png" alt="交流群" width="240">
+  <img src="docs/assets/qq-group.png" alt="PSP 网易云交流群 1103558445" width="240">
 </p>
-
-<p align="center">
-  <img src="docs/assets/qq-group.png" alt="交流群" width="240">
-</p>
+<p align="center"><sub>扫码加群：PSP 网易云交流群（1103558445）</sub></p>

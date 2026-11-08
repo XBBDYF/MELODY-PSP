@@ -7,19 +7,23 @@
 
 ## 1. 启动与联网
 
+```mermaid
+flowchart TD
+    A[module_start] --> B[创建 melody_main 线程]
+    B --> C[log_open 滚动日志]
+    C --> D[store_init 设置/最近/收藏]
+    D --> E[cache_init 读 cache/index]
+    E --> F[gfx_init 显存初始化 GE/GU]
+    F --> G[audio_init 起输出/解码线程]
+    G --> H[net_init WLAN + APCTL]
+    H --> I[api_init 起 melody_api 线程]
+    I --> J[dl_init 起 melody_dl 线程]
+    J --> K[主循环 SC_BOOT]
+    K --> L[自动连接 job_probe]
 ```
-prx_entry.c: module_start
-  └─ 创建 melody_main 线程 → main()
-       ├─ log_open()              滚动日志写到 ./log.txt（限制大小）
-       ├─ store_init()            读设置/最近/收藏
-       ├─ cache_init()            读 cache/index
-       ├─ gfx_init()              显存初始化，选 GE/GU
-       ├─ audio_init()            起输出/解码线程（此时空转）
-       ├─ net_init()              WLAN 驱动 + APCTL 注册
-       ├─ api_init()              起 melody_api 线程
-       ├─ dl_init()               起 melody_dl 线程
-       └─ 进入主循环，SC_BOOT → 自动连接
-```
+
+启动顺序如上：**先本地状态，再显存，最后网络**。这样即使没插网卡/没配 WiFi，
+程序也能进界面（设置、缓存、本地音乐都可用），不会卡在启动阶段。
 
 自动连接（`job_probe` 链路）：
 
@@ -35,16 +39,20 @@ prx_entry.c: module_start
 
 ## 2. 搜索
 
-```
-用户输入 → api_request_search(q)
-   ├─ job_search：GET /api/cloudsearch/pc?s=<q>&type=1&limit=<N>&offset=<off>
-   │    ├─ list_cb 把每首歌写入 g_pending（Song）
-   │    └─ 第一页额外调用 alt_kuwo_search_songs()      ← 第三方补充
-   │         · 酷我搜索是纯 HTTP，返回原唱条目
-   │         · 解析时丢弃「片段/铃声/伴奏/纯音乐/KTV/试听」和超长合辑
-   │         · 结果带 playable=2、fee=-1，界面标「酷我」
-   ├─ 去重（同名同歌手）后合并，投 EV_LIST_OK → 主线程
-   └─ 主线程 copy_list_from_api() 复制到 g_list，再 sort_search_list()
+```mermaid
+flowchart TD
+    Q[用户输入] --> R[api_request_search q]
+    R --> NE[网易 cloudsearch<br/>第一页 limit/offset]
+    NE --> P1[list_cb 写入 g_pending]
+    P1 --> K{第一页?}
+    K -- 是 --> KW[alt_kuwo_search_songs<br/>酷我纯 HTTP 搜索]
+    KW --> F[丢弃片段/铃声/伴奏/纯音乐/KTV/超长合辑]
+    F --> DED[按 同名+同歌手 去重后追加<br/>playable=2, fee=-1]
+    K -- 否 --> DED2[直接进入合并]
+    DED --> CP[EV_LIST_OK → 主线程]
+    DED2 --> CP
+    CP --> COPY[copy_list_from_api 复制到 g_list]
+    COPY --> SORT[sort_search_list<br/>原唱优先 + 稳定插入排序]
 ```
 
 排序（`main.c:song_score`）：
@@ -67,26 +75,47 @@ prx_entry.c: module_start
 `main.c` 里只有两条入口：`play_index()`（当前列表）与 `play_song_obj()`（任意一首）。
 真正的取址在 API 线程：
 
+```mermaid
+flowchart TD
+    A[play_index / play_song_obj] --> B[api_request_play]
+    B --> C{缓存完整?}
+    C -- 是 --> C1[audio_play_cached<br/>不发网络请求]
+    C -- 否 --> D{playable == 2<br/>网易无地址?}
+    D -- 是 --> E[alt_resolve 先试]
+    D -- 否 --> F[resolve_url<br/>enhance/player/url]
+    F -- 45x / 无地址 --> E
+    F -- 成功 --> G[拿到直链]
+    E --> G
+    C1 --> H[audio_play_stream]
+    G --> H
+    H --> I[dl_stream_start<br/>交给 dl 线程取流]
+    I --> J[解码线程 wait_data → 找首帧]
+    J --> K[预缓冲约 1.5s → 播放]
 ```
-job_play(index, song)
-  ├─ 1) 缓存命中（cache_complete）→ 直接 audio_play_cached()，不发网络请求
-  ├─ 2) playable==2（网易无地址）→ alt_resolve() 先试，失败再走官方接口
-  ├─ 3) resolve_url(id)：/api/song/enhance/player/url
-  │       ├─ 品质：默认 128k，历史失败会降级（api_note_play_fail）
-  │       └─ 45x 错误 → alt_resolve()
-  ├─ 4) alt_resolve()：byfuns → 酷我 → 本地网关 → GDStudio（用户可在设置里开关）
-  └─ 5) 拿到 url 后 audio_play_stream(song, url, total)
-```
+
+取址细节（按优先级）：
+
+1. 缓存命中（`cache_complete`）→ 直接 `audio_play_cached()`，不发网络请求；
+2. `playable==2`（网易无地址）→ `alt_resolve()` 先试，失败再走官方接口；
+3. `resolve_url(id)`：`/api/song/enhance/player/url`，默认 128k，历史失败会降级；
+4. `alt_resolve()`：byfuns → 酷我 → 本地网关 → GDStudio（设置里可开关）；
+5. 拿到 url 后 `audio_play_stream(song, url, total)`。
 
 `audio_play_stream()` 之后：
 
-```
-dl_stream_start(song, url, total, gen)   ← 把「取流」交给 dl 线程
-decode 线程：
-  wait_data(gen, 0, 1)       等 dl 线程先建文件、写出第一个字节
-  detect_id3 / 找第一帧
-  预缓冲约 1.5 秒 → 开始播放
-  播放中：ring buffer 不足 → BUFFER；解码失败 → 重同步；连续失败 → AUDIO_ERROR
+```mermaid
+flowchart LR
+    A[dl_stream_start<br/>建文件 / 写首字节] --> B[解码线程 wait_data]
+    B --> C[detect_id3 / 找首帧]
+    C --> D[预缓冲 1.5s]
+    D --> E[播放]
+    E --> F{环形缓冲不足?}
+    F -- 是 --> G[BUFFER 等待]
+    G --> E
+    E --> H{解码失败?}
+    H -- 单帧 --> I[重同步]
+    I --> E
+    H -- 连续失败 --> J[AUDIO_ERROR → 主线程重试]
 ```
 
 事件：`EV_PLAY_OK`（起播成功）、`EV_PLAY_FAIL`（取址失败）。
@@ -100,13 +129,18 @@ decode 线程：
 
 ## 4. 下载
 
-```
-用户选中若干首 → dl_enqueue(id, song)
-dl 线程：
-  job_begin：建 cache/<id>.mp3，写 .part 标记（失败重试 4 次）
-  分片：默认 4 条连接（设置 2..6），Range 请求，每片写自己的偏移
-  每 64KB 批量 flush，`.part` 里保存「已校验前缀 + 各片进度」
-  完成：校验总长度 → 改名发布 → cache_add(id) → EV_CACHE_DIRTY
+```mermaid
+flowchart TD
+    A[选中若干首 → dl_enqueue] --> B[job_begin<br/>建 cache/id.mp3]
+    B --> C[写 .part 标记<br/>失败重试 4 次]
+    C --> D[分片：默认 4 连接<br/>设置 2..6，Range 请求]
+    D --> E[每 64KB 批量 flush]
+    E --> F[.part 保存<br/>已校验前缀 + 各片进度]
+    F --> G{整首完成?}
+    G -- 否 --> D
+    G -- 是 --> H[校验总长度]
+    H --> I[改名发布 + cache_add]
+    I --> J[EV_CACHE_DIRTY → 刷新界面]
 ```
 
 三条重要规则：
@@ -125,14 +159,21 @@ dl 线程：
 
 ## 5. MV
 
-```
-mv_open(song) → mv_resolve() 取 MV 地址（网易 /api/song/enhance/mv/url）
-  ├─ 在线流：mv_stream_enabled() ? mvsrc 快速取流 : 下载完再播
-  ├─ 起播门槛：实测码率必须 ≥ 1.25 × 视频码率，否则先缓冲
-  │    （连接页显示：速率、所需带宽、已缓冲、剩余时间）
-  └─ 解码：
-       ├─ AVC 原生模块（melody_mv_avc.prx）—— 硬解，兼容性有限
-       └─ 软件模块（melody_mv565[_fast|_balanced|_sharp].prx）—— 四档画质
+```mermaid
+flowchart TD
+    A[mv_open song] --> B[mv_resolve<br/>enhance/mv/url]
+    B --> C{在线流开启?}
+    C -- 是 --> D[mvsrc 快速取流]
+    C -- 否 --> E[下载完再播]
+    D --> F{实测速率 ≥ 1.25 × 视频码率?}
+    E --> F
+    F -- 否 --> G[继续缓冲<br/>连接页显示速率/所需带宽/剩余时间]
+    G --> F
+    F -- 是 --> H{解码路径}
+    H -- AVC 原生 --> I[melody_mv_avc.prx<br/>硬解，兼容性有限]
+    H -- 软件模块 --> J[melody_mv565*.prx<br/>四档画质]
+    I --> K[显示]
+    J --> K
 ```
 
 本地 MV：设置项「本地 MV 搜索」控制是否扫描 `ms0:/VIDEO`，默认关闭
@@ -142,22 +183,38 @@ mv_open(song) → mv_resolve() 取 MV 地址（网易 /api/song/enhance/mv/url�
 
 ## 6. 皮肤
 
+```mermaid
+flowchart TD
+    A[启动] --> B[skin_runtime_init 读主题 id]
+    B --> C[skin_runtime_apply ./skin_release/melody/skins/id]
+    C --> D{validate: 目录/skin.json/Lua 语法}
+    D -- 失败 --> E[退回原生界面 + skin_runtime_error]
+    D -- 通过 --> F[建 VM，注册 ui.* / app.*]
+    F --> G[每帧: skin_runtime_draw page,t,dt]
+    G --> H[skin.lua draw page, model]
+    H --> I[skin_runtime_input → 动作字符串]
+    I --> J[main.c 执行: play/next/open_settings]
 ```
-启动：skin_runtime_init() 读 store 里的主题 id → skin_runtime_apply(./skins/<id>)
-  ├─ validate：目录结构、skin.json、Lua 语法
-  ├─ 建 VM：栈/堆上限固定，注册 ui.* / text.* / input.* 等宿主函数
-  └─ 每帧：skin_runtime_draw(page, t, dt) → skin.lua 的 draw(page, m)
-输入：skin_runtime_input(page, pressed, held, dt) → 返回动作字符串
-动作：main.c 执行（如 "play"、"next"、"open_settings"）
-```
+
+皮肤执行约定：
+
+- `draw(page, m)` 每帧调用，`m` 是宿主打包的数据表（页面、播放状态、列表窗口等）；
+- `input(page, pressed, held, dt)` 返回动作字符串，主程序统一执行，皮肤不直接改状态；
+- VM 有固定内存与「字符串工作量」预算，超限回退原生界面而不是崩溃；
+- 危险全局函数（`dofile`/`load`/`pcall`/`setmetatable`）在初始化时被移除。
 
 皮肤安装（设置 → 主题 → 在线主题）：
 
-```
-skin_catalog_refresh()  GET melody/skins/index.json（COS）
-skin_catalog_install(id)：
-  下载 zip → 解到 skins/<id>.tmp → 校验 → 改名发布（rename 是原子的）
-  mkdir/write 失败会重试 3 次（每次 25/50ms），失败原因写进 skin_catalog_install_error()
+```mermaid
+flowchart TD
+    A[skin_catalog_refresh] --> B[GET melody/skins/index.json]
+    B --> C[用户选择安装]
+    C --> D[下载 zip 到 skins/id.tmp]
+    D --> E{解压与校验}
+    E -- 失败 --> F[重试 3 次 / 25 与 50ms]
+    F -- 仍失败 --> G[skin_catalog_install_error 显示原因]
+    E -- 成功 --> H[rename 发布 skins/id]
+    H --> I[皮肤列表刷新并可选]
 ```
 
 主题页会在列表项下方直接显示失败原因，而不是只弹一个「安装失败」。
@@ -166,22 +223,33 @@ skin_catalog_install(id)：
 
 ## 7. 在线更新
 
-```
-启动静默检查：GET melody/version.txt
-  ├─ 第一行版本号 > APP_VER
-  ├─ 第二行 EBOOT.PBP 地址，第三行字节数，第四行 crc32
-  └─ 说明行（第 5 行起）= 更新日志，弹窗里滚动显示
-用户确认 → 下载 EBOOT.PBP 到 ./MELODY.PBP → 校验 crc32 → 重启进入安装
-安装（启动器）：校验 0-20% → 逐模块解压 20-90% → 替换提交 90-100%
+```mermaid
+flowchart TD
+    A[启动静默检查] --> B[GET melody/version.txt]
+    B --> C{第一行版本 > APP_VER?}
+    C -- 否 --> Z[结束]
+    C -- 是 --> D[弹窗显示更新日志<br/>第 5 行起逐条滚动]
+    D --> E{用户确认?}
+    E -- 稍后 --> Z
+    E -- 更新 --> F[下载 EBOOT.PBP 到 ./MELODY.PBP]
+    F --> G{crc32 校验}
+    G -- 失败 --> H[提示校验失败，不安装]
+    G -- 通过 --> I[重启进入安装器]
+    I --> J[校验 0-20%]
+    J --> K[逐模块解压 20-90%]
+    K --> L[替换与提交 90-100%]
+    L --> M[保留设置/缓存/队列，写入新版本]
 ```
 
 更新图库（更新后首次启动的展示页）：
 
-```
-update-preview-pending.txt（版本 + revision）→ 请求
-  melody/update-preview/<version>/index.json
-  校验 schema=1、版本、revision（= 安装包的 bundle crc32）
-  下载 01.png/02.png 到 ./update-preview/ 并显示
+```mermaid
+flowchart LR
+    A[update-preview-pending.txt<br/>版本 + revision] --> B[GET update-preview/version/index.json]
+    B --> C{schema=1 且 版本/revision 匹配?}
+    C -- 否 --> D[放弃显示，保留原生界面]
+    C -- 是 --> E[下载 01.png / 02.png 到 ./update-preview/]
+    E --> F[首屏展示本次更新内容]
 ```
 
 ---

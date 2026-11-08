@@ -17,17 +17,19 @@ MELODY 能跑起来，靠的不只是这个仓库里的代码。这里按「帮�
 ## 代码与库
 
 | 项目 | 帮了什么 |
-|---|---|
-| **[WiliMini](https://github.com/wilimini/WiliMini)**（GPL-3.0） | 软件视频解码的实现与经验：`pspvideo` 接口、FFmpeg 在 PSP 上的裁剪与性能处理。没有它就没有 MV 播放 |
-| **[FFmpeg](https://ffmpeg.org/)**（LGPL-2.1-or-later） | 容器解析与音视频解码的底座 |
-| **[pspdev / PSPSDK](https://github.com/pspdev/pspdev)**（BSD-3-Clause） | 工具链、`sce*` 接口、启动器打包；PSP 自制程序的地基 |
-| **[Lua](https://www.lua.org/)**（MIT） | 皮肤 VM：让换主题不用重新编译 |
-| **[libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)**（BSD-3-Clause / IJG / zlib） | 封面解码 |
-| **mcidclan（m-c/d）** — [MElib / PSP ME MIST](https://github.com/mcidclan)（MIT） | Media Engine 硬解与 Custom Core 的研究资料 |
-| **[PPSSPP](https://github.com/hrydgard/ppsspp)** | 接口行为对照与快速迭代验证；大量疑点先在模拟器上排除 |
-| **[PMPlayer Advance](https://github.com/DavisDev/pmplayer-advance)** | AVC 播放流程参考 |
-| **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)** | 接口字段与调用方式资料（本程序直接请求官方接口，未内置该服务） |
-| **思源黑体 / WenQuanYi Micro Hei** | 点阵字库的来源字体（OFL-1.1 / Apache-2.0） |
+| 项目 | 帮了什么 | 许可证 |
+|---|---|---|
+| **[WiliMini](https://github.com/wilimini/WiliMini)** | 软件视频解码的实现与经验：`pspvideo` 接口、FFmpeg 在 PSP 上的裁剪与性能处理。没有它就没有 MV 播放 | **GPL-3.0** |
+| **[FFmpeg](https://ffmpeg.org/)** | 容器解析与音视频解码的底座 | **LGPL-2.1-or-later** |
+| **[pspdev / PSPSDK](https://github.com/pspdev/pspdev)** | 工具链、`sce*` 接口、启动器打包；PSP 自制程序的地基 | **BSD-3-Clause** |
+| **[Lua](https://www.lua.org/)** | 皮肤 VM：让换主题不用重新编译 | **MIT** |
+| **[libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo)** | 封面解码（经 `coverjpeg_psp` 封装） | **BSD-3-Clause / IJG / zlib** |
+| **[zlib](https://zlib.net/)** | gzip 解压与更新包压缩 | **zlib License** |
+| **mcidclan（m-c/d）** — [MElib / PSP ME MIST](https://github.com/mcidclan) | Media Engine 硬解与 Custom Core 的研究资料 | **MIT** |
+| **[PPSSPP](https://github.com/hrydgard/ppsspp)** | 接口行为对照与快速迭代验证；大量疑点先在模拟器上排除 | 参考（GPL-2.0-or-later） |
+| **[PMPlayer Advance](https://github.com/DavisDev/pmplayer-advance)** | AVC 播放流程参考 | 参考（GPL-2.0） |
+| **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)** | 接口字段与调用方式资料（本程序直接请求官方接口，未内置该服务） | 参考（MIT） |
+| **思源黑体 / WenQuanYi Micro Hei** | 点阵字库的来源字体 | **SIL OFL 1.1 / Apache-2.0** |
 
 ## 特别感谢
 

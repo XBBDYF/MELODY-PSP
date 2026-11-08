@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "skins": [
+    {
+      "id": "ruby",
+      "name": "经典红",
+      "author": "洗不白de衣服 / XBBDYF",
+      "version": "1.0",
+      "description": "基础全页面配色，即时切换",
+      "script": false,
+      "preview": true
+    },
+    {
+      "id": "ocean",
+      "name": "海洋蓝",
+      "author": "洗不白de衣服 / XBBDYF",
+      "version": "1.0",
+      "description": "基础全页面配色，即时切换",
+      "script": false,
+      "preview": true
+    },
+    {
+      "id": "mint",
+      "name": "薄荷绿",
+      "author": "洗不白de衣服 / XBBDYF",
+      "version": "1.0",
+      "description": "基础全页面配色，即时切换",
+      "script": false,
+      "preview": true
+    },
+    {
+      "id": "metro",
+      "name": "Metro · Windows Phone",
+      "author": "洗不白de衣服 / XBBDYF",
+      "version": "5.7",
+      "description": "黑白配色合一，在主题设置中即时切换颜色与动态磁贴",
+      "script": true,
+      "preview": true
+    },
+    {
+      "id": "paper",
+      "name": "千禧纸面",
+      "author": "洗不白de衣服 / XBBDYF",
+      "version": "1.0",
+      "description": "带动画、功能入口与模块复用的脚本界面",
+      "script": true,
+      "preview": true
+    },
+    {
+      "id": "daylight",
+      "name": "白天模式",
+      "author": "洗不白de衣服 / XBBDYF",
+      "version": "1.0",
+      "description": "恢复原版白天/黑夜配色",
+      "script": false,
+      "preview": true
+    },
+    {
+      "id": "night",
+      "name": "黑夜模式",
+      "author": "洗不白de衣服 / XBBDYF",
+      "version": "1.0",
+      "description": "恢复原版白天/黑夜配色",
+      "script": false,
+      "preview": true
+    },
+    {
+      "id": "xmb",
+      "name": "PSP · XMB",
+      "version": "2.2",
+      "author": "MELODY",
+      "description": "音乐功能目录与文件夹导航，独立PSP播放页，多配色音乐动效",
+      "script": true,
+      "preview": true
+    }
+  ]
+}

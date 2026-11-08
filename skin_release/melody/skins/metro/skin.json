@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "id": "metro",
+  "name": "Metro · Windows Phone",
+  "author": "洗不白de衣服 / XBBDYF",
+  "version": "5.7",
+  "description": "黑白配色合一，在主题设置中即时切换颜色与动态磁贴",
+  "dark": true,
+  "colors": {
+    "background": "#080808",
+    "panel": "#080808",
+    "text": "#FFFFFF",
+    "secondary": "#BBBBBB",
+    "muted": "#969696",
+    "line": "#3E3E3E",
+    "accent": "#0078D7",
+    "hot": "#0078D7",
+    "panel2": "#171717",
+    "row": "#292930",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#54D49B",
+    "warning": "#F5A957",
+    "shadow": "#000000"
+  },
+  "script": "skin.lua",
+  "chrome": {
+    "mini_player": false,
+    "status": false,
+    "transition": false
+  },
+  "assets": [
+    {
+      "id": "move",
+      "file": "assets/move.wav",
+      "type": "sound"
+    },
+    {
+      "id": "confirm",
+      "file": "assets/confirm.wav",
+      "type": "sound"
+    },
+    {
+      "id": "back",
+      "file": "assets/back.wav",
+      "type": "sound"
+    },
+    {
+      "id": "disc",
+      "file": "assets/disc.png",
+      "type": "image"
+    }
+  ],
+  "preferences": [
+    {
+      "id": "color_mode",
+      "label": "主题颜色",
+      "type": "choice",
+      "options": [
+        "黑色",
+        "白色"
+      ],
+      "default": 0
+    },
+    {
+      "id": "live_tiles",
+      "label": "磁贴动态翻面",
+      "type": "toggle",
+      "default": 1
+    }
+  ],
+  "min_app_version": "3.5.0",
+  "optional_capabilities": [
+    "disc",
+    "avatar",
+    "tile_cover",
+    "theme_settings",
+    "begin_navigation",
+    "lyric_text"
+  ]
+}

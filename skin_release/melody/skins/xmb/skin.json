@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "id": "xmb",
+  "name": "PSP · XMB",
+  "version": "2.2",
+  "author": "MELODY",
+  "description": "音乐功能目录与文件夹导航，独立PSP播放页，多配色音乐动效",
+  "dark": true,
+  "script": "skin.lua",
+  "min_app_version": "3.5.0",
+  "optional_capabilities": [
+    "disc",
+    "avatar",
+    "image",
+    "sound",
+    "theme_settings",
+    "begin_navigation",
+    "wave",
+    "lyric_text"
+  ],
+  "chrome": {
+    "mini_player": false,
+    "status": false,
+    "transition": false
+  },
+  "colors": {
+    "background": "#0B1A46",
+    "panel": "#112557",
+    "text": "#FFFFFF",
+    "secondary": "#D9E1F0",
+    "muted": "#A6B5D0",
+    "line": "#56719A",
+    "accent": "#FFFFFF",
+    "hot": "#D8E7FF",
+    "panel2": "#243B66",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#A7E8DD",
+    "warning": "#FFDFA0",
+    "row": "#29466E",
+    "shadow": "#07132D"
+  },
+  "assets": [
+    {
+      "id": "wave",
+      "type": "image",
+      "file": "assets/wave.png"
+    },
+    {
+      "id": "confirm",
+      "type": "sound",
+      "file": "assets/confirm.wav"
+    },
+    {
+      "id": "wave_static",
+      "type": "image",
+      "file": "assets/wave_static.png"
+    },
+    {
+      "id": "blue",
+      "type": "image",
+      "file": "assets/blue.png"
+    },
+    {
+      "id": "purple",
+      "type": "image",
+      "file": "assets/purple.png"
+    },
+    {
+      "id": "green",
+      "type": "image",
+      "file": "assets/green.png"
+    },
+    {
+      "id": "amber",
+      "type": "image",
+      "file": "assets/amber.png"
+    },
+    {
+      "id": "rose",
+      "type": "image",
+      "file": "assets/rose.png"
+    },
+    {
+      "id": "silver",
+      "type": "image",
+      "file": "assets/silver.png"
+    }
+  ],
+  "preferences": [
+    {
+      "id": "color_style",
+      "label": "颜色风格",
+      "type": "choice",
+      "options": [
+        "深海蓝",
+        "暮光紫",
+        "森林绿",
+        "琥珀橙",
+        "玫瑰粉",
+        "月光银"
+      ],
+      "default": 0
+    },
+    {
+      "id": "music_fx",
+      "label": "音乐背景动效",
+      "type": "choice",
+      "options": [
+        "关闭",
+        "雨点",
+        "音波"
+      ],
+      "default": 0
+    },
+    {
+      "id": "wave_motion",
+      "label": "波浪动态",
+      "type": "toggle",
+      "default": 1
+    },
+    {
+      "id": "icon_zoom",
+      "label": "选中图标放大",
+      "type": "toggle",
+      "default": 1
+    }
+  ]
+}

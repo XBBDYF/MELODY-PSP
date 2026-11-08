@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "id": "metro_day",
+  "name": "Metro · 旧白天版迁移",
+  "author": "洗不白de衣服 / XBBDYF",
+  "version": "5.7",
+  "description": "兼容旧选择；请使用Metro主题设置切换黑色/白色",
+  "dark": false,
+  "colors": {
+    "background": "#FFFFFF",
+    "panel": "#FFFFFF",
+    "text": "#141414",
+    "secondary": "#555555",
+    "muted": "#666666",
+    "line": "#D2D2D2",
+    "accent": "#0078D7",
+    "hot": "#0078D7",
+    "panel2": "#EFEFEF",
+    "row": "#EFEFEF",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#54D49B",
+    "warning": "#F5A957",
+    "shadow": "#999999"
+  },
+  "script": "skin.lua",
+  "chrome": {
+    "mini_player": false,
+    "status": false,
+    "transition": false
+  },
+  "assets": [
+    {
+      "id": "move",
+      "file": "assets/move.wav",
+      "type": "sound"
+    },
+    {
+      "id": "confirm",
+      "file": "assets/confirm.wav",
+      "type": "sound"
+    },
+    {
+      "id": "back",
+      "file": "assets/back.wav",
+      "type": "sound"
+    },
+    {
+      "id": "disc",
+      "file": "assets/disc.png",
+      "type": "image"
+    }
+  ],
+  "preferences": [
+    {
+      "id": "color_mode",
+      "label": "主题颜色",
+      "type": "choice",
+      "options": [
+        "黑色",
+        "白色"
+      ],
+      "default": 1
+    },
+    {
+      "id": "live_tiles",
+      "label": "磁贴动态翻面",
+      "type": "toggle",
+      "default": 1
+    }
+  ],
+  "min_app_version": "3.5.0",
+  "optional_capabilities": [
+    "disc",
+    "avatar",
+    "tile_cover",
+    "theme_settings",
+    "begin_navigation",
+    "lyric_text"
+  ]
+}

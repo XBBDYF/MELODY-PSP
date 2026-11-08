@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "daylight",
+  "name": "白天模式",
+  "author": "洗不白de衣服 / XBBDYF",
+  "version": "1.0",
+  "description": "恢复原版白天/黑夜配色",
+  "dark": false,
+  "colors": {
+    "background": "#EFEFEF",
+    "panel": "#FBFBFB",
+    "text": "#222222",
+    "secondary": "#666666",
+    "muted": "#9A9A9A",
+    "line": "#E3E3E3",
+    "accent": "#C20C0C",
+    "hot": "#EF2727",
+    "panel2": "#F1F1F1",
+    "row": "#ECECEC",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#2BA471",
+    "warning": "#E04B4B",
+    "shadow": "#9A9A9A"
+  }
+}

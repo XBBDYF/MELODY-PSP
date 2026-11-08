@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "night",
+  "name": "黑夜模式",
+  "author": "洗不白de衣服 / XBBDYF",
+  "version": "1.0",
+  "description": "恢复原版白天/黑夜配色",
+  "dark": true,
+  "colors": {
+    "background": "#101012",
+    "panel": "#18181A",
+    "text": "#EAEAEA",
+    "secondary": "#A2A2A8",
+    "muted": "#707078",
+    "line": "#2D2D31",
+    "accent": "#EC4141",
+    "hot": "#FF5F5F",
+    "panel2": "#242427",
+    "row": "#26262A",
+    "white": "#FFFFFF",
+    "black": "#000000",
+    "success": "#3ECF8E",
+    "warning": "#FF6B6B",
+    "shadow": "#000000"
+  }
+}

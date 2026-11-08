@@ -1,0 +1,6 @@
+{
+  "version": "5.4.7",
+  "source": "https://github.com/lua/lua/tree/v5.4.7",
+  "archive_sha256": "5c39111b3fc4c1c9e56671008955a1730f54a15b95e1f1bd0752b868b929d8e3",
+  "license": "MIT"
+}

@@ -1,0 +1,55 @@
+{
+  "png_production_sources_modified": false,
+  "device_writes_or_deployment": false,
+  "host_test": {
+    "script": "tests/png_regression/check.py",
+    "command": "python tests/png_regression/check.py",
+    "fixtures": 10,
+    "checks": 40,
+    "passed": 40,
+    "failed": 0,
+    "cases_per_fixture": ["192 RGBA pixels equal Pillow reference with output canary", "64 RGBA integer box average equals Pillow pixel reference with output canary", "truncated PNG rejected", "bad chunk CRC rejected"],
+    "existing_warning": "src/png.h:11: /* within comment",
+    "limitation": "Original decoder already passes the two exact-length failure URL images on host. PSP PNG failure root cause not established; no old-fail/new-pass claim."
+  },
+  "source_sha256": {
+    "src/png.c": "D03158DB21694AAE0E9D39B64657902A152546F5186402C9C47464506B3DCA31",
+    "src/png.h": "F742A80F7240F767391D2AB36471BD40C4E6538FA4BDF85B518D5483F672C484",
+    "backup_directory": "backups/png_20261105",
+    "source_and_backup_hashes_equal": true
+  },
+  "cdn_requests": [
+    {
+      "url": "https://p3.music.126.net/ZbtJx4G_bquAbOYKeQmAdA==/109951173424053197.jpg?param=192y192&type=jpg",
+      "bytes": 36323,
+      "magic_hex": "89504e47",
+      "format": "PNG",
+      "width": 192,
+      "height": 192
+    },
+    {
+      "url": "https://p3.music.126.net/ZbtJx4G_bquAbOYKeQmAdA==/109951173424053197.jpg?imageView&thumbnail=192x192&type=jpg",
+      "bytes": 6383,
+      "magic_hex": "ffd8ffe0",
+      "format": "JPEG",
+      "width": 192,
+      "height": 192
+    },
+    {
+      "url": "https://p3.music.126.net/n-W23k0NTkpI8Jr3OFZo9w==/109951169507941293.jpg?param=192y192&type=jpg",
+      "bytes": 73601,
+      "magic_hex": "89504e47",
+      "format": "PNG",
+      "width": 192,
+      "height": 192
+    },
+    {
+      "url": "https://p3.music.126.net/n-W23k0NTkpI8Jr3OFZo9w==/109951169507941293.jpg?imageView&thumbnail=192x192&type=jpg",
+      "bytes": 9143,
+      "magic_hex": "ffd8ffe0",
+      "format": "JPEG",
+      "width": 192,
+      "height": 192
+    }
+  ]
+}

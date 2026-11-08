@@ -1,0 +1,15 @@
+TARGET = loader
+OBJS = loader.o
+LIBS += -lz -lpspdebug -lpspdisplay -lpspge
+CFLAGS += -MMD -MP -G0 -I../../src -IE:/WiliMini/decoder/include
+
+loader.o: loader.c bundle_update.h native_avc_host.h ../../src/melody_host.h
+-include loader.d
+PSP_EBOOT_TITLE = MELODY
+PSP_EBOOT_ICON = ../../assets/ICON0.PNG
+PSP_EBOOT_PIC1 = ../../assets/PIC1.PNG
+EBOOT.PBP: ../../assets/ICON0.PNG ../../assets/PIC1.PNG Makefile.loader
+
+PSPSDK = $(shell psp-config --pspsdk-path)
+include $(PSPSDK)/lib/build.mak
+

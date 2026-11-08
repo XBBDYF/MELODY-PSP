@@ -1,0 +1,191 @@
+--- upstream/src/jmorecfg.h
++++ private-src/jmorecfg.h
+@@ -1,3 +1,7 @@
++/* CoverJPEG PSP decode-only modifications.
++ * Copyright (C) 2026 MELODY project contributors.
++ * Original upstream copyright and license notices follow unchanged.
++ */
+ /*
+  * jmorecfg.h
+  *
+@@ -235,15 +239,15 @@
+ /* Capability options common to encoder and decoder: */
+ 
+ #define DCT_ISLOW_SUPPORTED     /* accurate integer method */
+-#define DCT_IFAST_SUPPORTED     /* less accurate int method [legacy feature] */
+-#define DCT_FLOAT_SUPPORTED     /* floating-point method [legacy feature] */
++#undef  DCT_IFAST_SUPPORTED     /* less accurate int method [legacy feature] */
++#undef  DCT_FLOAT_SUPPORTED     /* floating-point method [legacy feature] */
+ 
+ /* Encoder capability options: */
+ 
+-#define C_MULTISCAN_FILES_SUPPORTED /* Multiple-scan JPEG files? */
+-#define C_PROGRESSIVE_SUPPORTED     /* Progressive JPEG? (Requires MULTISCAN)*/
+-#define C_LOSSLESS_SUPPORTED        /* Lossless JPEG? */
+-#define ENTROPY_OPT_SUPPORTED       /* Optimization of entropy coding parms? */
++#undef  C_MULTISCAN_FILES_SUPPORTED /* Multiple-scan JPEG files? */
++#undef  C_PROGRESSIVE_SUPPORTED     /* Progressive JPEG? (Requires MULTISCAN)*/
++#undef  C_LOSSLESS_SUPPORTED        /* Lossless JPEG? */
++#undef  ENTROPY_OPT_SUPPORTED       /* Optimization of entropy coding parms? */
+ /* Note: if you selected 12-bit data precision, it is dangerous to turn off
+  * ENTROPY_OPT_SUPPORTED.  The standard Huffman tables are only good for 8-bit
+  * precision, so jchuff.c normally uses entropy optimization to compute
+@@ -253,20 +257,20 @@
+  * the default tables don't work for progressive mode or lossless mode.
+  * (This may get fixed, however.)
+  */
+-#define INPUT_SMOOTHING_SUPPORTED   /* Input image smoothing option? */
++#undef  INPUT_SMOOTHING_SUPPORTED   /* Input image smoothing option? */
+ 
+ /* Decoder capability options: */
+ 
+ #define D_MULTISCAN_FILES_SUPPORTED /* Multiple-scan JPEG files? */
+ #define D_PROGRESSIVE_SUPPORTED     /* Progressive JPEG? (Requires MULTISCAN)*/
+-#define D_LOSSLESS_SUPPORTED        /* Lossless JPEG? */
++#undef  D_LOSSLESS_SUPPORTED        /* Lossless JPEG? */
+ #define SAVE_MARKERS_SUPPORTED      /* jpeg_save_markers() needed? */
+ #define BLOCK_SMOOTHING_SUPPORTED   /* Block smoothing? (Progressive only) */
+ #define IDCT_SCALING_SUPPORTED      /* Output rescaling via IDCT? */
+ #undef  UPSAMPLE_SCALING_SUPPORTED  /* Output rescaling at upsample stage? */
+ #define UPSAMPLE_MERGING_SUPPORTED  /* Fast path for sloppy upsampling? */
+-#define QUANT_1PASS_SUPPORTED       /* 1-pass color quantization? */
+-#define QUANT_2PASS_SUPPORTED       /* 2-pass color quantization? */
++#undef  QUANT_1PASS_SUPPORTED       /* 1-pass color quantization? */
++#undef  QUANT_2PASS_SUPPORTED       /* 2-pass color quantization? */
+ 
+ /* more capability options later, no doubt */
+ 
+--- upstream/src/jdinput.c
++++ private-src/jdinput.c
+@@ -1,3 +1,7 @@
++/* CoverJPEG PSP decode-only modifications.
++ * Copyright (C) 2026 MELODY project contributors.
++ * Original upstream copyright and license notices follow unchanged.
++ */
+ /*
+  * jdinput.c
+  *
+@@ -66,7 +70,7 @@
+   } else
+ #endif
+   {
+-    if (cinfo->data_precision != 8 && cinfo->data_precision != 12)
++    if (cinfo->data_precision != 8)
+       ERREXIT1(cinfo, JERR_BAD_PRECISION, cinfo->data_precision);
+   }
+ 
+--- upstream/src/jdmaster.c
++++ private-src/jdmaster.c
+@@ -1,3 +1,7 @@
++/* CoverJPEG PSP decode-only modifications.
++ * Copyright (C) 2026 MELODY project contributors.
++ * Original upstream copyright and license notices follow unchanged.
++ */
+ /*
+  * jdmaster.c
+  *
+@@ -528,6 +532,10 @@
+   }
+ #endif
+ 
++  /* Private 8-bit decode build: reject unsupported precision explicitly. */
++  if (cinfo->data_precision != 8)
++    ERREXIT1(cinfo, JERR_BAD_PRECISION, cinfo->data_precision);
++
+   /* Initialize dimensions and other stuff */
+   jpeg_calc_output_dimensions(cinfo);
+   prepare_range_limit_table(cinfo);
+@@ -574,8 +582,6 @@
+ #ifdef QUANT_1PASS_SUPPORTED
+       if (cinfo->data_precision == 8)
+         jinit_1pass_quantizer(cinfo);
+-      else if (cinfo->data_precision == 12)
+-        j12init_1pass_quantizer(cinfo);
+       else
+         ERREXIT1(cinfo, JERR_BAD_PRECISION, cinfo->data_precision);
+       master->quantizer_1pass = cinfo->cquantize;
+@@ -589,8 +595,6 @@
+ #ifdef QUANT_2PASS_SUPPORTED
+       if (cinfo->data_precision == 8)
+         jinit_2pass_quantizer(cinfo);
+-      else if (cinfo->data_precision == 12)
+-        j12init_2pass_quantizer(cinfo);
+       else
+         ERREXIT1(cinfo, JERR_BAD_PRECISION, cinfo->data_precision);
+       master->quantizer_2pass = cinfo->cquantize;
+@@ -609,8 +613,6 @@
+ #ifdef UPSAMPLE_MERGING_SUPPORTED
+       if (cinfo->data_precision == 8)
+         jinit_merged_upsampler(cinfo); /* does color conversion too */
+-      else if (cinfo->data_precision == 12)
+-        j12init_merged_upsampler(cinfo); /* does color conversion too */
+       else
+         ERREXIT1(cinfo, JERR_BAD_PRECISION, cinfo->data_precision);
+ #else
+@@ -620,9 +622,7 @@
+       if (cinfo->data_precision <= 8) {
+         jinit_color_deconverter(cinfo);
+         jinit_upsampler(cinfo);
+-      } else if (cinfo->data_precision <= 12) {
+-        j12init_color_deconverter(cinfo);
+-        j12init_upsampler(cinfo);
++
+       } else {
+ #ifdef D_LOSSLESS_SUPPORTED
+         j16init_color_deconverter(cinfo);
+@@ -634,8 +634,6 @@
+     }
+     if (cinfo->data_precision <= 8)
+       jinit_d_post_controller(cinfo, cinfo->enable_2pass_quant);
+-    else if (cinfo->data_precision <= 12)
+-      j12init_d_post_controller(cinfo, cinfo->enable_2pass_quant);
+     else
+ #ifdef D_LOSSLESS_SUPPORTED
+       j16init_d_post_controller(cinfo, cinfo->enable_2pass_quant);
+@@ -651,8 +649,6 @@
+      */
+     if (cinfo->data_precision <= 8)
+       jinit_lossless_decompressor(cinfo);
+-    else if (cinfo->data_precision <= 12)
+-      j12init_lossless_decompressor(cinfo);
+     else
+       j16init_lossless_decompressor(cinfo);
+     /* Entropy decoding: either Huffman or arithmetic coding. */
+@@ -667,8 +663,6 @@
+                    cinfo->buffered_image;
+     if (cinfo->data_precision <= 8)
+       jinit_d_diff_controller(cinfo, use_c_buffer);
+-    else if (cinfo->data_precision <= 12)
+-      j12init_d_diff_controller(cinfo, use_c_buffer);
+     else
+       j16init_d_diff_controller(cinfo, use_c_buffer);
+ #else
+@@ -678,8 +672,6 @@
+     /* Inverse DCT */
+     if (cinfo->data_precision == 8)
+       jinit_inverse_dct(cinfo);
+-    else if (cinfo->data_precision == 12)
+-      j12init_inverse_dct(cinfo);
+     else
+       ERREXIT1(cinfo, JERR_BAD_PRECISION, cinfo->data_precision);
+     /* Entropy decoding: either Huffman or arithmetic coding. */
+@@ -703,18 +695,12 @@
+     /* Initialize principal buffer controllers. */
+     use_c_buffer = cinfo->inputctl->has_multiple_scans ||
+                    cinfo->buffered_image;
+-    if (cinfo->data_precision == 12)
+-      j12init_d_coef_controller(cinfo, use_c_buffer);
+-    else
+-      jinit_d_coef_controller(cinfo, use_c_buffer);
++    jinit_d_coef_controller(cinfo, use_c_buffer);
+   }
+ 
+   if (!cinfo->raw_data_out) {
+     if (cinfo->data_precision <= 8)
+       jinit_d_main_controller(cinfo, FALSE /* never need full buffer here */);
+-    else if (cinfo->data_precision <= 12)
+-      j12init_d_main_controller(cinfo,
+-                                FALSE /* never need full buffer here */);
+     else
+ #ifdef D_LOSSLESS_SUPPORTED
+       j16init_d_main_controller(cinfo,

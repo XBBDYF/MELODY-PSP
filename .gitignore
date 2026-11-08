@@ -1,0 +1,51 @@
+# 构建产物
+*.o
+*.d
+*.a
+*.elf
+*.prx
+*.PBP
+*.SFO
+*.bin.tmp
+
+# 构建/发布/备份目录
+releases/
+dist_*/
+backups/
+.tmp/
+build/
+build-*/
+tools/mvtest/build*/
+tools/prxloader/*.elf
+tools/prxloader/melody.prx
+tools/prxloader/EBOOT.PBP
+third_party/coverjpeg_psp/build-psp/
+third_party/coverjpeg_psp/build-host/
+
+# 运行时生成
+log.txt
+dns.txt
+*.part
+cache/
+update-preview/
+update-preview-pending.txt
+update-preview-seen.txt
+settings.txt
+recent.txt
+fav.txt
+
+# 测试与工具缓存
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# 抓取/临时素材
+*.zip
+*.log

@@ -27,6 +27,7 @@ static void *g_ram[]={ram[0],ram[1]}, *g_vram[]={vram[0],vram[1]};
 static void *g_fb_display[]={vram[0],vram[1]};
 static int g_back,g_last,g_ready=1,g_direct_video,g_skip_copy,g_immediate;
 static int g_renderer,g_ge_frame;
+static void (*g_present_overlay)(void);
 static unsigned g_render_started,g_render_frames,g_render_time_total;
 static unsigned g_render_draws,g_render_uploads,g_render_syncs;
 static void *scanout=vram[1], *pending;

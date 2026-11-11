@@ -206,8 +206,8 @@ local function xmbSearch(t,m)
   if ime and #cands>0 then
    local off=m.ime_off or 0;text(17,122,26,"候选",0,C.dim)
    if off>0 then text(45,122,8,"<",0,C.accent)end
-   for i=0,3 do local idx=off+i+1;local v=cands[idx];if v and v~=""then local x=56+i*68;local sel=m.chip_row==2 and (m.ime_selected or 1)==idx;if sel then ui.rect(x,119,64,20,C.accent)end;text(x+3,122,58,v,0,sel and C.bg or C.fg)end end
-   if off+4<#cands then text(330,122,8,">",0,C.accent)end
+   for i=0,3 do local idx=off+i+1;local v=cands[i+1];if v and v~=""then local x=56+i*68;local sel=m.chip_row==2 and (m.ime_selected or 1)==idx;if sel then ui.rect(x,119,64,20,C.accent)end;text(x+3,122,58,v,0,sel and C.bg or C.fg)end end
+   if off+4<(m.ime_total or #cands)then text(330,122,8,">",0,C.accent)end
   end
   text(356,101,110,"历史",0,C.dim)
   for i=1,math.min(#hist,2)do local y=115+(i-1)*16;local sel=m.chip_row==3 and (m.hist_selected or 1)==i;if sel then ui.rect(353,y-1,116,15,C.accent)end;text(357,y,110,hist[i],0,sel and C.bg or C.dim)end

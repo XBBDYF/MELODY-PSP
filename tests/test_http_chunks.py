@@ -29,7 +29,8 @@ static int recv(int sock,char *b,int len,int flags){
  memcpy(b,wire+pos,len);pos+=len;if(timeout_each)pending_timeout=1;return len;
 }
 static void ka_put(const char*h,int p,int sock){(void)h;(void)p;(void)sock;puts_count++;}
-static int close(int sock){(void)sock;closes_count++;return 0;}
+static int g_offline,g_dialog_reserved;
+static int tracked_close(int sock){(void)sock;closes_count++;return 0;}
 '''
 code+=section('static int recv_wait(', 'static int send_all(')
 code+=section('static int fill(', '/* ------------------------------------------------------------------ */\n/* HTTP')

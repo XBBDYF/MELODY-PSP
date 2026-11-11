@@ -39,6 +39,11 @@
 #include "skin_runtime.h"
 #include "skin_options_ui.h"
 #include "power_runtime.h"
+#include "ultra_player.h"
+#include "wifi_dialog.h"
+#include "ime_update.h"
+#include "overclock_dialog.h"
+#include "platform_plugins.h"
 #include "ime.h"
 #include "search_history.h"
 #include "search_chips.h"
@@ -2835,7 +2840,14 @@ static void input_settings(unsigned int pressed, unsigned int held, float dt)
         return;
     }
     if(setting==3&&(pressed&(PSP_CTRL_CIRCLE|PSP_CTRL_LEFT|PSP_CTRL_RIGHT))){open_skin_center();return;}
+    if(setting==29&&(pressed&PSP_CTRL_CIRCLE)){overclock_dialog_open();return;}
+    if(setting==28&&(pressed&PSP_CTRL_CIRCLE)){
+        if(ime_update_start()<0)ui_toast("词库更新正忙或当前禁止联网");
+        else ui_toast("正在后台下载并验证词库，成功后即时生效");
+        return;
+    }
     if(setting>=25&&setting<=27&&(pressed&(PSP_CTRL_LEFT|PSP_CTRL_RIGHT|PSP_CTRL_CIRCLE))){
+        if(power_runtime_locked()){ui_toast("当前省电皮肤接管性能设置，请退出皮肤后调整");return;}
         if(power_runtime_cycle(setting,(pressed&PSP_CTRL_LEFT)?-1:1)<0)ui_toast("省电设置保存失败");
         else ui_toast("省电设置已保存；MV 自动恢复性能档");
         return;
@@ -2953,6 +2965,7 @@ static void input_boot(unsigned int pressed)
     }
 }
 
+static int g_wifi_dialog_renderer=-1;
 static void input_wifi(unsigned int pressed, unsigned int held, float dt)
 {
     if (btn_repeat(pressed, held, dt, PSP_CTRL_UP)) {
@@ -2984,13 +2997,16 @@ static void input_wifi(unsigned int pressed, unsigned int held, float dt)
 
     if (pressed & PSP_CTRL_SELECT) {
         refresh_profiles();
-        ui_toast("已刷新");
+        platform_plugins_probe();ui_toast(platform_plugins_wifi_status());
     }
 
     if (pressed & PSP_CTRL_TRIANGLE) {
-        net_utility_dialog();
-        refresh_profiles();
-        api_request_probe();
+        api_cancel_pending_prefetch();
+        for(int i=0;i<dl_queue_count();++i)dl_queue_pause(i);
+        int previous_renderer=gfx_renderer();
+        if(gfx_set_renderer(GFX_RENDERER_GE)<0)ui_toast("系统联网界面需要GU初始化，当前不可用");
+        else if(wifi_dialog_start()<0){gfx_set_renderer(previous_renderer);ui_toast("系统联网界面暂不可用（离线或已有窗口）");}
+        else {g_wifi_dialog_renderer=previous_renderer;ui_toast("正在打开系统联网界面");}
     }
 
     if (pressed & PSP_CTRL_CROSS) {
@@ -4094,6 +4110,7 @@ int app_main(void)
     gfx_init();
     log_open();
     power_runtime_init();
+    platform_plugins_probe();
     mlog("MELODY PSP %s start %s %s", APP_VER, __DATE__, __TIME__);
     if (playback_context_init() < 0) {
         power_runtime_shutdown();
@@ -4123,6 +4140,8 @@ int app_main(void)
     snprintf(g_app.net_msg, sizeof(g_app.net_msg), "正在初始化");
 
     ui_init();
+    if(!power_runtime_ultra())ime_load_dictionary(APP_DIR);
+    if(power_runtime_ultra())net_set_offline(1); /* Before any API/download worker starts. */
     if(!privacy_gate()){power_runtime_shutdown();mlog("privacy declined: exit before audio/network/API initialization");log_close();sceKernelExitGame();return 0;}
     /* Reserve the idle stream worker before optional high-address GUI caches.
      * A late64KiB stack otherwise pins the gap after those caches are freed. */
@@ -4165,9 +4184,11 @@ int app_main(void)
         if (sceCtrlPeekBufferPositive(&pad0, 1) > 0) g_prev_btn = pad0.Buttons;
     }
 
+    ultra_player_init();
+    if(power_runtime_ultra())net_set_offline(1);
     if (dev_mode() == 5) {
         open_wifi_screen();
-    } else if (dev_mode() != 50) {
+    } else if (dev_mode() != 50 && !power_runtime_ultra()) {
         api_request_probe();
     } else {
         mlog("dev50: skip probe");
@@ -4203,12 +4224,66 @@ int app_main(void)
         }
 
         /* Wake keys never reach playback/menu actions, even while held. */
+        power_runtime_ultra_interactive(power_runtime_ultra()&&ultra_player_needs_ui_clock());
         if(power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),
              ((sampled_held|pressed)&(PSP_CTRL_SELECT|PSP_CTRL_START|PSP_CTRL_UP|PSP_CTRL_DOWN|
                PSP_CTRL_LEFT|PSP_CTRL_RIGHT|PSP_CTRL_LTRIGGER|PSP_CTRL_RTRIGGER|
                PSP_CTRL_TRIANGLE|PSP_CTRL_CIRCLE|PSP_CTRL_CROSS|PSP_CTRL_SQUARE))!=0,g_app.screen==SC_MV||g_mv_connecting||mv_active(),
              api_busy()||audio_state()==AUDIO_BUFFER,
              g_app.screen==SC_BOOT||g_app.screen==SC_WIFI)) pressed=held=0;
+        {
+            static int ultra_entered;
+            if(power_runtime_ultra()){
+                if(!ultra_entered){
+                    ultra_entered=1;
+                    ime_update_cancel();net_set_offline(1);
+                    api_cancel_pending_prefetch();api_clear_pending_downloads();
+                    for(int i=0;i<dl_queue_count();++i)dl_queue_pause(i);
+                    skin_transition_reset();
+                    local_scan(); /* Startup ultra bypasses normal frame-4 initialization. */
+                    ultra_player_enter();
+                    mlog("ultra: local-only entered files=%d network_offline=%d",local_count(),net_offline());log_flush();
+                }
+                {static float flushed;static int state=-1;int current=audio_state();
+                 if(current!=state){state=current;mlog("ultra: audio state=%d pos=%d clock=%d",current,audio_pos_ms(),power_runtime_effective_clock());}
+                 if(g_app.time-flushed>=5){flushed=g_app.time;log_flush();}}
+                if(g_exit_req){running=0;continue;}
+                if(ultra_player_tick(pressed,held,dt)){
+                    char err[192];
+                    if(skin_runtime_apply(APP_DIR "skins/metro",err,sizeof(err))<0)skin_runtime_reset();
+                    net_set_offline(0);ime_load_dictionary(APP_DIR);ultra_entered=0;set_screen(SC_HOME);
+                    ui_theme_changed();g_prev_btn=held;continue;
+                }
+                if(power_runtime_render_due((unsigned)(sceKernelGetSystemTimeWide()/1000),0)){
+                    ultra_player_draw();gfx_flip();
+                }else sceKernelDelayThread(20000);
+                continue;
+            }
+            if(ultra_entered){net_set_offline(0);ultra_entered=0;}
+        }
+        {
+            static int dialog_was_active;
+            int was=wifi_dialog_blocks_input();
+            wifi_dialog_tick();
+            if(wifi_dialog_blocks_input()){
+                dialog_was_active=1;
+                power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,0,1,1);
+                gfx_set_present_overlay(wifi_dialog_draw);
+                ui_draw();gfx_flip();
+                g_prev_btn=held;g_pending_press=0;
+                continue;
+            }
+            if(was||dialog_was_active){
+                dialog_was_active=0;gfx_set_present_overlay(NULL);
+                if(g_wifi_dialog_renderer>=0){gfx_set_renderer(g_wifi_dialog_renderer);g_wifi_dialog_renderer=-1;}
+                refresh_profiles();g_prev_btn=held;g_pending_press=0;
+                if(wifi_dialog_get_result()==WIFI_DIALOG_RESULT_CONNECTED){
+                    ui_toast("系统WiFi已连接，正在验证网络");api_request_probe();
+                }else ui_toast("系统联网界面已关闭");
+                continue;
+            }
+        }
+        ime_update_poll();
         pump_events();
 
         /* 启动静默检查发现新版本：回到主页就弹窗（只弹一次，按过"稍后"不再弹） */
@@ -4610,7 +4685,8 @@ int app_main(void)
 
         if(!notice_requested&&g_app.online&&g_app.screen!=SC_MV){notice_requested=1;api_request_announcement_check();}
         if(!notice_seen&&community_announcement_get()&&g_app.screen!=SC_MV&&!g_app.upd_dlg){notice_seen=1;notice_open=1;notice_scroll=0;notice_ignore=COMMUNITY_ANNOUNCEMENT_DEFAULT_IGNORE;}
-        if(policy_open){
+        if(overclock_dialog_active()){overclock_dialog_input(pressed);g_prev_btn=held;}
+        else if(policy_open){
             if(btn_repeat(pressed,held,dt,PSP_CTRL_UP)&&policy_scroll>0)--policy_scroll;
             if(btn_repeat(pressed,held,dt,PSP_CTRL_DOWN)&&policy_scroll<40)++policy_scroll;
             if(pressed&(PSP_CTRL_CROSS|PSP_CTRL_CIRCLE))policy_open=0;
@@ -4828,6 +4904,7 @@ int app_main(void)
     /* 退出前先把刚下载的更新换上：下次启动直接是新版本，不用再进两次。 */
     update_apply_startup();
 
+    ime_update_cancel();
     power_runtime_shutdown();
     mlog("exit: stopping audio");
     audio_stop();

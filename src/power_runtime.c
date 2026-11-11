@@ -1,6 +1,7 @@
 /* Foreground-only power control. Audio/API workers keep running while blank. */
 #include "power_runtime.h"
 #include "power_policy.h"
+#include "overclock_bridge.h"
 #include "app.h"
 #include "log.h"
 #include <pspkernel.h>
@@ -22,6 +23,8 @@ static void apply_backlight(int seconds) {
     mlog("power: backlight timeout=%d result=0x%08X",target,r);
 }
 static MelodyPowerPolicy policy;
+static int ultra_clock=133,ultra_interactive;
+static int profile, manual_eco, manual_timeout, manual_clock;
 static int initial_cpu, initial_bus, effective_cpu, display_blanked, initialized;
 static int clock_failed,last_clock_target;
 static unsigned last_clock_attempt;
@@ -74,10 +77,13 @@ void power_runtime_init(void) {
               fscanf(f,"%d %d %d",&eco,&seconds,&mhz)==3&&valid(eco,seconds,mhz)) {
         policy.eco=eco;policy.timeout_seconds=seconds;policy.clock_mhz=mhz;
     }fclose(f);}io_unlock();
+    manual_eco=policy.eco;manual_timeout=policy.timeout_seconds;manual_clock=policy.clock_mhz;
+    profile=0;
     apply_backlight(policy.timeout_seconds);
     initialized=1;
 }
 int power_runtime_set(const char *key,int value) {
+    if(profile||overclock_bridge_owns_clock())return -2;
     int eco=policy.eco,seconds=policy.timeout_seconds,mhz=policy.clock_mhz;
     if(!strcmp(key,"eco"))eco=value;
     else if(!strcmp(key,"timeout"))seconds=value;
@@ -85,6 +91,7 @@ int power_runtime_set(const char *key,int value) {
     else return -1;
     if(!valid(eco,seconds,mhz)||save_config(eco,seconds,mhz)<0)return -1;
     policy.eco=eco;policy.timeout_seconds=seconds;policy.clock_mhz=mhz;
+    manual_eco=eco;manual_timeout=seconds;manual_clock=mhz;
     policy.last_input_ms=(unsigned)(sceKernelGetSystemTimeWide()/1000);
     policy.blanked=0;
     apply_backlight(seconds);
@@ -92,6 +99,7 @@ int power_runtime_set(const char *key,int value) {
     return 0;
 }
 int power_runtime_cycle(int id,int direction) {
+    if(profile||overclock_bridge_owns_clock())return -2;
     const int *v;int n,old;
     if(id==25)return power_runtime_set("eco",!policy.eco);
     if(id==26){v=timeouts;n=6;old=policy.timeout_seconds;}
@@ -103,11 +111,12 @@ int power_runtime_cycle(int id,int direction) {
 }
 int power_runtime_tick(unsigned now,int input,int movie,int busy,int keep_awake) {
     if(!initialized)return 0;
-    int wake=melody_power_policy_tick(&policy,now,input,movie,keep_awake);
-    int target=melody_power_clock_target(&policy,movie,busy,333);
+    int external=overclock_bridge_owns_clock();
+    int wake=melody_power_policy_tick(&policy,now,input,movie,keep_awake||external);
+    int target=profile==2?(ultra_interactive?222:ultra_clock):melody_power_clock_target(&policy,movie,busy,333);
     int actual=scePowerGetCpuClockFrequencyInt();
     if(actual>0)effective_cpu=(actual>=target-1&&actual<=target+1)?target:actual; /* Firmware resume may change the hardware clock. */
-    if(target!=effective_cpu&&(!clock_failed||target!=last_clock_target||(unsigned)(now-last_clock_attempt)>=1000u)){
+    if(!external&&target!=effective_cpu&&(!clock_failed||target!=last_clock_target||(unsigned)(now-last_clock_attempt)>=1000u)){
         last_clock_attempt=now;last_clock_target=target;
         int bus=target==initial_cpu&&policy.clock_mhz==0&&!policy.eco&&!movie?initial_bus:target/2;
         int r=scePowerSetClockFrequency(target,target,bus);
@@ -118,7 +127,7 @@ int power_runtime_tick(unsigned now,int input,int movie,int busy,int keep_awake)
     /* Tick only the display while keeping it awake; never block power switch. */
     if(movie||keep_awake||policy.timeout_seconds<0||input||(!backlight_supported&&policy.timeout_seconds>0&&!policy.blanked))
         scePowerTick(PSP_POWER_TICK_DISPLAY);
-    if(policy.blanked&&!display_blanked){
+    if(!external&&policy.blanked&&!display_blanked){
         if(sceDisplayGetFrameBuf(&saved_fb,&saved_stride,&saved_format,PSP_DISPLAY_SETBUF_IMMEDIATE)>=0&&saved_fb&&
            sceDisplaySetFrameBuf(NULL,saved_stride,saved_format,PSP_DISPLAY_SETBUF_IMMEDIATE)>=0){
             display_blanked=1;mlog("power: framebuffer off; backlight timer supported=%d",backlight_supported);
@@ -129,7 +138,14 @@ int power_runtime_tick(unsigned now,int input,int movie,int busy,int keep_awake)
     }
     return wake;
 }
-int power_runtime_render_due(unsigned now,int movie){return melody_power_render_due(&policy,now,movie);}
+int power_runtime_render_due(unsigned now,int movie){
+    if(profile==2&&!policy.blanked){
+        unsigned interval=(unsigned)(now-policy.last_input_ms)<1500u?50u:250u;
+        if((unsigned)(now-policy.last_render_ms)<interval)return 0;
+        policy.last_render_ms=now;return 1;
+    }
+    return melody_power_render_due(&policy,now,movie);
+}
 int power_runtime_eco(void){return policy.eco;}
 int power_runtime_timeout(void){return policy.timeout_seconds;}
 int power_runtime_clock(void){return policy.clock_mhz;}
@@ -142,7 +158,7 @@ void power_runtime_shutdown(void){
     if(display_blanked&&saved_fb)sceDisplaySetFrameBuf(saved_fb,saved_stride,saved_format,PSP_DISPLAY_SETBUF_IMMEDIATE);
     display_blanked=0;
     if(original_backlight>=0)sceImposeSetBacklightOffTime(original_backlight);
-    scePowerSetClockFrequency(initial_cpu,initial_cpu,initial_bus);
+    if(!overclock_bridge_owns_clock())scePowerSetClockFrequency(initial_cpu,initial_cpu,initial_bus);
 }
 
 /* Reserved, user-edited theme preference IDs. Applying a theme alone changes nothing. */
@@ -166,3 +182,29 @@ int power_runtime_theme_value(const char *id){
     if(!strcmp(id,"system_clock")){for(int i=0;i<4;++i)if(clocks[i]==policy.clock_mhz)return i;}
     return -1;
 }
+
+void power_runtime_set_profile(int next){
+    if(next<0||next>2||profile==next||(next&&overclock_bridge_owns_clock()))return;
+    if(!profile){manual_eco=policy.eco;manual_timeout=policy.timeout_seconds;manual_clock=policy.clock_mhz;}
+    profile=next;
+    policy.eco=next?1:manual_eco;
+    policy.timeout_seconds=next==2?30:(next==1?60:manual_timeout);
+    policy.clock_mhz=next==2?ultra_clock:(next==1?222:manual_clock);
+    policy.last_input_ms=(unsigned)(sceKernelGetSystemTimeWide()/1000);
+    policy.blanked=0;clock_failed=0;
+    apply_backlight(policy.timeout_seconds);
+    mlog("power: theme profile=%d eco=%d timeout=%d clock=%d locked=%d",profile,policy.eco,policy.timeout_seconds,policy.clock_mhz,profile!=0);
+}
+int power_runtime_profile(void){return profile;}
+int power_runtime_locked(void){return profile!=0;}
+int power_runtime_ultra(void){return profile==2;}
+
+int power_runtime_set_ultra_clock(int mhz){
+    if(profile!=2||overclock_bridge_owns_clock())return -2;
+    if(mhz!=133&&mhz!=100&&mhz!=80&&mhz!=66)return -1;
+    ultra_clock=mhz;policy.clock_mhz=mhz;clock_failed=0;
+    mlog("power: ultra user clock target=%d (physical playback stability unverified)",mhz);
+    return 0;
+}
+
+void power_runtime_ultra_interactive(int active){ultra_interactive=!!active;}

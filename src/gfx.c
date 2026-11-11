@@ -199,6 +199,9 @@ unsigned short *gfx_backbuffer(void)
     gfx_cpu_barrier();return g_fb[g_back];
 }
 
+static void (*g_present_overlay)(void);
+void gfx_set_present_overlay(void (*draw)(void)){g_present_overlay=draw;}
+
 void gfx_flip(void)
 {
     if (!g_ready || g_direct_video) return;
@@ -220,6 +223,7 @@ void gfx_flip(void)
      * NEXTFRAME here can defer adoption until the following vblank, while
      * g_back already reuses the old scanout for the next GE frame. CPU keeps
      * its existing RAM-render/copy scheduling. IMMEDIATE means next hsync. */
+    if(g_present_overlay)g_present_overlay();
     sceDisplayWaitVblankStart();
     int display_result = sceDisplaySetFrameBuf(
         g_fb_display[g_back], FB_STRIDE, PSP_DISPLAY_PIXEL_FORMAT_565,

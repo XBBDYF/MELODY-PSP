@@ -85,6 +85,15 @@ flowchart LR
 6. 缓存索引在磁盘，元数据按窗口懒加载。`CACHE_MAX=64`是窗口大小，**不是歌曲总数上限**。
 7. 主线程管输入和页面；API线程管串行网络业务；下载线程管流和下载任务；音频解码与输出分线程。不要在绘制或按键处理里加入阻塞网络请求。
 
+## 2026-11-11后续功能入口
+
+- 省电皮肤所有权/锁定：`power_runtime.c`、清单`power_profile`，ECO四配色；`docs/POWER-PROFILES.md`。
+- 极致离线前台：`ultra_player.c/h`；主循环early分支；`net_set_offline`最终门禁、API/图片worker暂停；本地/完整缓存分开，静态歌词与离线封面开关，低频133/100/80/66仅此模式。
+- 独立可更新词库：`ime_pack.c/h`（PSP低级SDK I/O）、`ime_update.c/h`（独立下载worker/主线程激活）、`docs/IME-PACK.md`。不要把CRC当来源签名，也不要全量把候选传Lua；模型只传4项window+ime_total。
+- 系统联网窗口：`wifi_dialog.c/h`；`gfx_set_present_overlay`在GU完成后系统绘制；net对话框APCTL独占、DNS代次、fd owner有界恢复。`docs/PSP-NETWORK-PLUGINS.md`。
+- 外部超频：`overclock_bridge.c/h`、`overclock_dialog.c/h`；仅用户明确交接外部opicker，没有应用设置400MHz的API，不自动安装/加载内核插件；`docs/PSP-OVERCLOCK.md`。
+- 设置旧ID0..27不变，新ID28词库更新，29外部超频；总30项。性能锁ID25..27由power_runtime保证，不仅UI禁用。
+
 ## 专题入口：有对应问题才继续读
 
 - [主题编辑指南](docs/THEME-EDITING-GUIDE.md)：先改什么、真实Lua／JSON接口、Metro磁贴与PSP/XMB实例、验证及发布。

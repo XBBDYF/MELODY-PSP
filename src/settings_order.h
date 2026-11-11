@@ -2,6 +2,6 @@
 #define MELODY_SETTINGS_ORDER_H
 /* Keep stored/action IDs stable while presenting related controls together.
  * Row 8 is the new local-MV switch (id 24), grouped with the video rows. */
-static const unsigned char melody_settings_order[28]={0,1,21,12,13,16,14,17,24,15,4,2,11,6,7,3,22,23,5,20,8,19,9,18,10,25,26,27};
-static inline int melody_setting_id(int row){return row>=0&&row<28?melody_settings_order[row]:-1;}
+static const unsigned char melody_settings_order[30]={0,1,21,12,13,16,14,17,24,15,4,2,11,6,7,3,22,23,5,20,8,19,9,18,10,25,26,27,28,29};
+static inline int melody_setting_id(int row){return row>=0&&row<30?melody_settings_order[row]:-1;}
 #endif

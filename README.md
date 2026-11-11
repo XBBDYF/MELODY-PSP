@@ -364,6 +364,10 @@ make WILIMINI=/path/to/WiliMini
 | [搜索页设计](docs/SEARCH-UI.md) | 输入法候选、搜索历史、推荐搜索的布局与按键 |
 | [输入法与主题字体](docs/IME-AND-FONTS.md) | 词表格式、罗马字规则、PSPF 字库与体积预算 |
 | [省电与背光控制](docs/POWER-SAVING-THEME.md) | ECO主题、熄屏时间、SoC时钟、主题接口与真机验证边界 |
+| [极致省电与模式锁](docs/POWER-PROFILES.md) | 离线本地/缓存、歌词封面开关、低频档 |
+| [可更新词库](docs/IME-PACK.md) | 包格式、候选窗口、服务器热更新与边界 |
+| [系统联网与插件](docs/PSP-NETWORK-PLUGINS.md) | PSP系统联网窗口与WPA2插件适配 |
+| [外部超频](docs/PSP-OVERCLOCK.md) | opicker控制权交接与机型边界 |
 | [主题制作包 THEME-KIT](THEME-KIT/README.md) | 给人类和 AI 的主题制作教程、API 全表、模板、校验工具 |
 | [测试说明](tests/README.md) | 测试分类、写法约定、需要额外产物的集成用例 |
 | [更新记录](CHANGELOG.md) | 4.1.1 → 4.1 → 4.0.1 → 4.0 → 3.5.0 → 3.4.x |

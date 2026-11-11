@@ -15,6 +15,9 @@
 
 #include "ui.h"
 #include "power_runtime.h"
+#include "ime_update.h"
+#include "overclock_dialog.h"
+#include "overclock_bridge.h"
 #include "ime.h"
 #include "search_history.h"
 
@@ -2538,7 +2541,7 @@ static const SetDef g_set_defs[SET_ITEMS] = {
  {0,"音质"},{0,"音量"},{2,"下载并发"},{4,"皮肤中心"},{2,"网络连接"},{4,"内存显示"},
  {3,"清空下载队列"},{3,"清空缓存"},{5,"账号与登录"},{6,"检查更新"},{6,"关于 MELODY"},
  {2,"备用音源"},{1,"视频解码"},{1,"软解画质"},{1,"视频加载"},{1,"软解格式"},
- {1,"MV清晰度"},{1,"提前缓冲"},{6,"公告"},{5,"隐私政策"},{4,"显示网速"},{0,"预下载后续歌曲"},{4,"界面渲染"},{4,"唱片播放器"},{1,"本地 MV 搜索"},{4,"省电模式"},{4,"自动息屏"},{4,"SoC 时钟"}
+ {1,"MV清晰度"},{1,"提前缓冲"},{6,"公告"},{5,"隐私政策"},{4,"显示网速"},{0,"预下载后续歌曲"},{4,"界面渲染"},{4,"唱片播放器"},{1,"本地 MV 搜索"},{4,"省电模式"},{4,"自动息屏"},{4,"SoC 时钟"},{6,"更新输入法词库"},{4,"外部超频插件"}
 };
 
 /* 把 [top,bottom) 这段保持在可视区里（不是钉在顶部，避免把页头滚没） */
@@ -2557,6 +2560,9 @@ static float follow_visible(float scroll, int top, int bottom, int view_top,
 static void settings_value(int i, char *val, int len)
 {
     val[0] = 0;
+    if(i==29){snprintf(val,len,"%s",overclock_bridge_owns_clock()?"外部接管（非实测MHz）":"未启用（需opicker）");return;}
+    if(i==28){if(ime_update_busy())snprintf(val,len,"下载/校验 %d%%",ime_update_percent());else snprintf(val,len,"%.90s",ime_update_message());return;}
+    if(i>=25&&i<=27&&power_runtime_locked()){snprintf(val,len,"皮肤接管（锁定）");return;}
     if(i==25){snprintf(val,len,"%s",power_runtime_eco()?"开（空闲30帧）":"关");return;}
     if(i==26){int s=power_runtime_timeout();if(s<0)snprintf(val,len,"常亮");else if(!s)snprintf(val,len,"跟随系统");else snprintf(val,len,"%d秒%s",s,power_runtime_backlight_supported()?"无操作":"（仅画面）");return;}
     if(i==27){int c=power_runtime_clock();if(c)snprintf(val,len,"%d MHz（MV 333）",c);else snprintf(val,len,"自动（当前%d MHz）",power_runtime_effective_clock());return;}
@@ -3553,6 +3559,10 @@ void ui_draw(void)
     }else if(g_app.busy&&g_app.screen!=SC_BOOT&&g_app.screen!=SC_SEARCH)spinner_draw(g_app.busy_x,14,g_app.spinner);
 
     if(!custom||!skin_runtime_style()->hide_status)screen_net_speed();
+    {
+        const char *mode=!power_runtime_eco()?"常规模式":(power_runtime_ultra()?"极致省电":(power_runtime_locked()?"省电·皮肤":"省电·手动"));
+        gfx_fill_rect(202,2,82,16,C_PANEL2);gfx_text(FS_SM,205,4,mode,C_ACC);
+    }
     export_progress_draw();
     skin_options_dialog_draw();
     toast_draw();
@@ -3561,6 +3571,7 @@ void ui_draw(void)
     if (g_app.screen == SC_PLAYER && g_app.menu_open) player_menu_draw();
     if (g_app.confirm_clear) confirm_draw();
     if (g_app.upd_dlg) upd_dialog_draw();
+    overclock_dialog_draw();
 }
 
 

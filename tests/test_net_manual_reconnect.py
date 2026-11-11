@@ -1,6 +1,7 @@
 """Production explicit reconnect must not accept an old GOT_IP association."""
 from pathlib import Path
 import subprocess,tempfile
+from net_fixture import owned_function, CONTROL_STUB
 R=Path(__file__).resolve().parents[1];s=(R/'src/net.c').read_text(encoding='utf-8');a=s.index('int net_manual_connect(');b=s.index('\nstatic void dns_expire(',a)
 code=r'''
 #include <assert.h>
@@ -19,7 +20,7 @@ static int sceNetApctlDisconnect(void){disconnects++;if(!stuck)state=0;return 0;
 static int sceKernelDelayThread(int us){assert(us==50000);delay_calls++;return 0;}
 static int aborted(void){return cancel;}
 static int net_apctl_connect(int profile,int seconds){assert(profile==4&&seconds==20&&state==0&&g_reconnecting&&g_auto_association_owned==0);connects++;state=4;return 0;}
-'''+s[a:b]+r'''
+'''+CONTROL_STUB+owned_function(s,'net_manual_connect')+r'''
 int main(void){assert(net_manual_connect(4,20)==0);assert(disconnects==1&&connects==1&&idles==1&&saved_dns==1&&!g_reconnecting&&!g_last_reconn_us);stuck=1;state=2;assert(net_manual_connect(4,20)==-3);assert(delay_calls==40&&connects==1&&!g_reconnecting);stuck=0;state=0;cancel=1;assert(net_manual_connect(4,20)==-2&&connects==1&&!g_reconnecting);cancel=0;wlan=0;assert(net_manual_connect(4,20)<0&&connects==1);wlan=1;g_reconnecting=1;assert(net_manual_connect(4,20)==-4);puts("PASS production manual reconnect: GOT_IP forced re-association; idle sockets and DNS retired; bounded disconnect; cancel/WLAN/ownership retained");}
 '''
 with tempfile.TemporaryDirectory(prefix='net-manual-')as t:

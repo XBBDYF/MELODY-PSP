@@ -7,11 +7,12 @@
  *
  * 约定：
  *   - 所有字符串都是 UTF-8；
- *   - 不分配内存，候选放在固定数组里；
+ *   - 候选保存按需分配的8字节引用；文本按可见窗口复制；
  *   - 上屏由调用方负责写入搜索框（ime_select 返回文本）。
  */
 #ifndef MELODY_IME_H
 #define MELODY_IME_H
+#include "ime_pack.h"
 
 enum {
     IME_OFF = 0,
@@ -20,7 +21,7 @@ enum {
     IME_ASCII = 3        /* 英文直输：字母直接进搜索框，不产生 preedit */
 };
 
-#define IME_MAX_CAND   512   /* 候选一屏放不下，界面做横向滚动窗口 */
+#define IME_MAX_CAND   512   /* Legacy buffer hint only: never a total candidate limit. */
 #define IME_PRE_MAX    48
 #define IME_WORD_MAX   24
 
@@ -40,8 +41,17 @@ const char *ime_last_commit(void);
 
 void ime_backspace(void);
 
-int  ime_candidate_count(void);
-const char *ime_candidate(int i);      /* i: 0..ime_candidate_count()-1 */
+/* All IME state/query/activate functions are main-thread only. Worker may only
+ * prepare/validate/install/close its OWN unactivated ImePack handle. */
+void ime_activate_pack(ImePack *prepared); /* Takes ownership; NULL = builtin fallback. */
+int ime_load_dictionary(const char *app_dir); /* Startup: app_dir/ime/current.bin or fallback. */
+unsigned int ime_dictionary_revision(void); /* 0 = builtin. */
+int ime_candidate_total(void);
+int ime_candidate_count(void); /* Compatibility: returns total, including indices >512. */
+/* Returned pointer is ephemeral: 8-slot scratch cache, invalidated by later queries,
+ * reset or activation. Copy a visible window instead of publishing these pointers. */
+const char *ime_candidate(int i);
+int ime_candidate_window(int first, char out[][IME_WORD_MAX], int max);
 
 /* 选中第 i 个候选：写入 out，清空 preedit；返回写入字节数，0 表示失败 */
 int  ime_select(int i, char *out, int cap);

@@ -14,6 +14,7 @@
 #include "log.h"
 
 #include <pspkernel.h>
+#include <pspkerror.h>
 #include <pspdisplay.h>
 #include <pspnet.h>
 #include <pspnet_inet.h>
@@ -51,6 +52,7 @@ static int dns_wait_ready(int deadline_ms);   /* 等 AP 真正报出 DNS 服务�
 /* 只有 http_get 需要 gzip：歌词/歌单/评论这些 JSON 压缩后只有 1/6 ~ 1/10，
  * 在 PSP 的 WiFi 上省下来的就是真金白银。音频/图片走同一套代码但不解压。 */
 static int g_want_gzip;
+static int g_net_ok;
 
 /* ---------------- 连接复用（keep-alive） ----------------
  * PSP 上每次 TCP 握手 + DNS 要几百毫秒，比 7KB 的 JSON 本身还贵。
@@ -64,6 +66,8 @@ typedef struct {
     unsigned last;
 } KeepAlive;
 
+static int tracked_close(int fd);
+static int network_blocked(void);
 static KeepAlive g_ka[KA_MAX];
 static int g_ka_ready;
 static int g_want_keepalive;
@@ -77,7 +81,7 @@ static void ka_init(void)
 
 static void ka_drop(int i)
 {
-    if (g_ka[i].sock >= 0) close(g_ka[i].sock);
+    if (g_ka[i].sock >= 0) tracked_close(g_ka[i].sock);
     g_ka[i].sock = -1;
     g_ka[i].host[0] = 0;
 }
@@ -122,6 +126,122 @@ static void ka_put(const char *host, int port, int sock)
 static void ka_close_all(void)
 {
     for (int i = 0; i < KA_MAX; ++i) ka_drop(i);
+}
+
+/* Socket registry uses a semaphore: libc/SDK calls may schedule threads and
+ * therefore must never execute with CPU interrupts disabled. Initialize before
+ * publishing g_net_ok; lock holders perform only short fd-management syscalls. */
+static unsigned char g_active_fd[FD_SETSIZE];
+static SceUID g_fd_lock = -1;
+static volatile SceUID g_fd_owner = -1;
+static int fd_lock(void)
+{
+    SceUID observed=g_fd_lock;
+    SceUInt timeout=100000;
+    if(observed<0)return 0;
+    if(sceKernelWaitSema(observed,1,&timeout)>=0){
+        g_fd_owner=sceKernelGetThreadId();return 1;
+    }
+    SceUID owner=g_fd_owner;
+    if(owner<=0||owner==sceKernelGetThreadId())return 0;
+    SceKernelThreadInfo info;memset(&info,0,sizeof(info));info.size=sizeof(info);
+    int rc=sceKernelReferThreadStatus(owner,&info);
+    int dead=rc==SCE_KERNEL_ERROR_UNKNOWN_THID||rc==SCE_KERNEL_ERROR_UNKNOWN_UID||
+        (rc>=0&&(info.status&(PSP_THREAD_STOPPED|PSP_THREAD_KILLED)));
+    if(!dead)return 0;
+    SceUID replacement=sceKernelCreateSema("melody_fds_recover",0,1,1,NULL);
+    if(replacement<0)return 0;
+    unsigned irq=sceKernelCpuSuspendIntr();
+    int swapped=g_fd_lock==observed&&g_fd_owner==owner;
+    if(swapped){g_fd_lock=replacement;g_fd_owner=-1;}
+    sceKernelCpuResumeIntr(irq);
+    if(!swapped){sceKernelDeleteSema(replacement);return 0;}
+    sceKernelDeleteSema(observed); /* Existing waiters fail instead of hanging. */
+    mlog("net: recovered dead fd-lock owner=%d",owner);
+    timeout=100000;
+    if(sceKernelWaitSema(replacement,1,&timeout)<0)return 0;
+    g_fd_owner=sceKernelGetThreadId();return 1;
+}
+static void fd_unlock(void) {
+    SceUID lock=g_fd_lock;g_fd_owner=-1;sceKernelSignalSema(lock,1);
+}
+static int tracked_socket(int domain, int type, int protocol)
+{
+    if (!fd_lock()) return -1;
+    if (network_blocked()) { fd_unlock(); errno = ECANCELED; return -1; }
+    int fd = socket(domain, type, protocol);
+    if (fd >= 0 && fd < FD_SETSIZE) g_active_fd[fd] = 1;
+    fd_unlock();
+    return fd;
+}
+static int tracked_close(int fd)
+{
+    if (!fd_lock()) return -1;
+    if (fd >= 0 && fd < FD_SETSIZE) g_active_fd[fd] = 0;
+    int result = close(fd);
+    fd_unlock();
+    return result;
+}
+static void shutdown_active(void)
+{
+    if (!fd_lock()) return;
+    for (int fd = 0; fd < FD_SETSIZE; ++fd)
+        if (g_active_fd[fd]) shutdown(fd, SHUT_RDWR);
+    fd_unlock();
+}
+static void dialog_retire_network(int connected);
+
+/* Offline/control gate: main thread owns setters; workers own enter/leave. */
+static volatile int g_offline;
+static volatile int g_dialog_reserved;
+static volatile int g_control_workers;
+int net_offline(void) { return g_offline; }
+static int network_blocked(void) { return g_offline || g_dialog_reserved; }
+static int control_enter(void)
+{
+    unsigned irq = sceKernelCpuSuspendIntr();
+    int okay = !g_offline && !g_dialog_reserved;
+    if (okay) ++g_control_workers;
+    sceKernelCpuResumeIntr(irq);
+    return okay;
+}
+static void control_leave(void)
+{
+    unsigned irq = sceKernelCpuSuspendIntr();
+    --g_control_workers;
+    sceKernelCpuResumeIntr(irq);
+}
+void net_set_offline(int offline)
+{
+    unsigned irq = sceKernelCpuSuspendIntr();
+    int changed = g_offline != !!offline;
+    g_offline = !!offline;
+    sceKernelCpuResumeIntr(irq);
+    if (changed && offline && g_net_ok) {
+        shutdown_active();
+        ka_close_all();
+        sceNetApctlDisconnect();
+    }
+}
+int net_dialog_begin(void)
+{
+    unsigned irq = sceKernelCpuSuspendIntr();
+    if (g_offline || !g_net_ok) { sceKernelCpuResumeIntr(irq); return -1; }
+    int first = !g_dialog_reserved;
+    g_dialog_reserved = 1;
+    int ready = g_control_workers == 0;
+    sceKernelCpuResumeIntr(irq);
+    if (first) shutdown_active();
+    return ready;
+}
+void net_dialog_end(int connected)
+{
+    /* Invalidate pools while reservation still prevents new worker requests. */
+    ka_close_all();
+    dialog_retire_network(connected);
+    unsigned irq = sceKernelCpuSuspendIntr();
+    g_dialog_reserved = 0;
+    sceKernelCpuResumeIntr(irq);
 }
 
 /* 全局打断标志：api 线程要跑播放请求时，把正在读的小请求打断 */
@@ -201,6 +321,7 @@ void http_set_abort(volatile int *flag)
 
 static int aborted(void)
 {
+    if (g_offline || g_dialog_reserved) return 1;
     SceUID self = sceKernelGetThreadId();
     if (self == g_cancel_owner && g_cancel_flag)
         return *g_cancel_flag != g_cancel_value;
@@ -379,13 +500,13 @@ void net_url_encode(const char *src, char *dst, int dstlen)
 /* 只有整套初始化成功才允许调 apctl/wlan/socket。
  * 以前 net_init 中途失败（内存不够时很常见）后面每个网络调用都会打到没加载的模块上，
  * 真机表现就是启动后立刻闪退；PPSSPP 不会。 */
-static int g_net_ok;
-
 int net_init(void)
 {
     int r;
 
     g_net_ok = 0;
+    if (g_fd_lock < 0) g_fd_lock = sceKernelCreateSema("melody_fds", 0, 1, 1, NULL);
+    if (g_fd_lock < 0) return -1;
     sceUtilityLoadModule(PSP_MODULE_NET_COMMON);
     sceUtilityLoadModule(PSP_MODULE_NET_INET);
 
@@ -438,7 +559,15 @@ static unsigned g_auto_association_us;
 static int g_auto_association_owned;
 static int g_last_profile;     /* 上次连上的配置号（自动重连用） */
 
+static int net_apctl_connect_owned(int profile, int seconds);
 int net_apctl_connect(int profile, int seconds)
+{
+    if (!control_enter()) return -4;
+    int result = net_apctl_connect_owned(profile, seconds);
+    control_leave();
+    return result;
+}
+static int net_apctl_connect_owned(int profile, int seconds)
 {
     int state = 0;
     int loops;
@@ -462,6 +591,7 @@ int net_apctl_connect(int profile, int seconds)
         mlog("apctl disconnect before connect (state=%d)", state);
         sceNetApctlDisconnect();
         for (int i = 0; i < 20; ++i) {
+            if (aborted()) return -4;
             if (sceNetApctlGetState(&state) == 0 &&
                 state == PSP_NET_APCTL_STATE_DISCONNECTED)
                 break;
@@ -469,11 +599,13 @@ int net_apctl_connect(int profile, int seconds)
         }
     }
 
+    if (aborted()) return -4;
     r = sceNetApctlConnect(profile);
     if (r < 0) {
         /* 掉线后立刻 Connect 偶尔会被协议栈拒绝，隔一下再试一次 */
         mlog("apctl connect(%d) = 0x%08X state=%d, retry", profile, r, net_apctl_state());
         sceKernelDelayThread(500 * 1000);
+        if (aborted()) return -4;
         r = sceNetApctlConnect(profile);
         if (r < 0) {
             mlog("apctl connect(%d) retry = 0x%08X state=%d", profile, r, net_apctl_state());
@@ -483,6 +615,7 @@ int net_apctl_connect(int profile, int seconds)
 
     loops = seconds * 4;
     for (int i = 0; i < loops; ++i) {
+        if (aborted()) return -4;
         sceNetApctlGetState(&state);
         if (state == PSP_NET_APCTL_STATE_GOT_IP) { g_last_profile = profile; break; }
         if (state == PSP_NET_APCTL_STATE_DISCONNECTED && i > 8) return -2;
@@ -511,7 +644,15 @@ static int g_reconnecting;
 
 /* Download-worker variant: apctl owns the asynchronous association state
  * machine. Never wait here or disconnect an in-progress API/user association. */
+static int net_reconnect_poll_owned(void);
 int net_reconnect_poll(void)
+{
+    if (!control_enter()) return -4;
+    int result = net_reconnect_poll_owned();
+    control_leave();
+    return result;
+}
+static int net_reconnect_poll_owned(void)
 {
     unsigned now = sceKernelGetSystemTimeLow();
     int state = net_apctl_state();
@@ -534,7 +675,15 @@ int net_reconnect_poll(void)
     return -1; /* pending or failed; a future poll observes GOT_IP */
 }
 
+static int net_reconnect_owned(void);
 int net_reconnect(void)
+{
+    if (!control_enter()) return -4;
+    int result = net_reconnect_owned();
+    control_leave();
+    return result;
+}
+static int net_reconnect_owned(void)
 {
     unsigned now = (unsigned)sceKernelGetSystemTimeLow();
     int st = net_apctl_state();
@@ -869,6 +1018,7 @@ static int dns_worker_step(void)
     char host[128];
     int rid, result, my;
 
+    if (g_offline || g_dialog_reserved) return -1;
     my = g_dns_gen;
     snprintf(host, sizeof(host), "%s", g_dns_host);
     result = sceNetResolverCreate(&rid, buffer, sizeof(buffer));
@@ -878,6 +1028,7 @@ static int dns_worker_step(void)
     }
     if (result >= 0) {
         unsigned irq = sceKernelCpuSuspendIntr();
+        if (my != g_dns_gen || network_blocked()) { sceKernelCpuResumeIntr(irq); return -1; }
         g_dns_ip = ip_pack((const unsigned char *)&address.s_addr);
         g_dns_state = 2;
         g_dns_done_gen = my;
@@ -886,6 +1037,7 @@ static int dns_worker_step(void)
     }
     {
         unsigned irq = sceKernelCpuSuspendIntr();
+        if (my != g_dns_gen || network_blocked()) { sceKernelCpuResumeIntr(irq); return -1; }
         g_dns_state = 3;
         g_dns_done_gen = my;
         sceKernelCpuResumeIntr(irq);
@@ -926,6 +1078,7 @@ static int dns_submit(const char *host)
 {
     int gen;
 
+    if (aborted()) return -1;
     if (g_dns_workers == 0 && dns_worker_start() < 0) return -1;
     snprintf(g_dns_host, sizeof(g_dns_host), "%s", host);
     gen = ++g_dns_gen;
@@ -1129,7 +1282,15 @@ dns_cancelled:
     return -1;
 }
 
+static int net_manual_connect_owned(int profile,int seconds);
 int net_manual_connect(int profile,int seconds)
+{
+    if (!control_enter()) return -4;
+    int result = net_manual_connect_owned(profile,seconds);
+    control_leave();
+    return result;
+}
+static int net_manual_connect_owned(int profile,int seconds)
 {
  if(!g_net_ok||profile<=0||!net_wlan_switch())return -1;
  g_auto_association_owned=0;
@@ -1146,6 +1307,33 @@ int net_manual_connect(int profile,int seconds)
  if(aborted()){g_reconnecting=0;return -2;}
  int result=net_apctl_connect(profile,seconds);g_reconnecting=0;
  mlog("net manual: association result=%d state=%d",result,net_apctl_state());return result;
+}
+
+static void dialog_retire_network(int connected)
+{
+    /* Reservation still excludes new consumers. Old SDK DNS calls may return
+     * late; changing generation makes their results unusable by new requests. */
+    unsigned irq = sceKernelCpuSuspendIntr();
+    ++g_dns_gen;
+    g_dns_done_gen = 0;
+    g_dns_state = 0;
+    g_dns_n = 0;
+    g_dns_sdk_fails = 0;
+    g_auto_association_owned = 0;
+    g_last_reconn_us = 0;
+    g_last_profile = 0;
+    sceKernelCpuResumeIntr(irq);
+    if (connected && !net_offline()) {
+        char name[64];
+        if (net_current_name(name, sizeof(name)) == 0) {
+            for (int id = 1; id <= NET_MAX_PROFILES; ++id) {
+                netData data;
+                if (sceUtilityCheckNetParam(id) == 0 &&
+                    sceUtilityGetNetParam(id, PSP_NETPARAM_NAME, &data) == 0 &&
+                    !strcmp(data.asString, name)) { g_last_profile = id; break; }
+            }
+        }
+    }
 }
 
 static void dns_expire(const char *host)
@@ -1230,11 +1418,11 @@ static int try_connect(unsigned int packed, int port, int timeout_ms, int rcvbuf
     unsigned int budget = (unsigned int)(timeout_ms <= 0 ? 6000 :
                                         timeout_ms > 60000 ? 60000 : timeout_ms) * 1000u;
 
-    sock = socket(AF_INET, SOCK_STREAM, 0);
+    sock = tracked_socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
         int first_error = errno;
         net_drop_idle();
-        sock = socket(AF_INET, SOCK_STREAM, 0);
+        sock = tracked_socket(AF_INET, SOCK_STREAM, 0);
         if (sock < 0) {
             saved_errno = errno;
             mlog("net tcp stage=socket port=%d result=-1 errno=%d first=%d",
@@ -1403,7 +1591,7 @@ connect_fail:
     mlog("net tcp port=%d ms=%u result=-1 errno=%d stage=%s fd=%d", port,
          (unsigned int)(sceKernelGetSystemTimeLow() - t0) / 1000, saved_errno, stage, sock);
     if (g_connect_http) g_connect_http->sock = -1;
-    close(sock);
+    tracked_close(sock);
     errno = saved_errno;
     return -1;
 }
@@ -1512,7 +1700,7 @@ int net_probe_host(const char *host, int port, int timeout_ms)
     conn_unlock();
 
     if (sock < 0) return -1;
-    close(sock);
+    tracked_close(sock);
     return 0;
 }
 
@@ -1853,6 +2041,7 @@ static int http_open_full(Http *h, const char *url, long long range_from, long l
     memset(h, 0, sizeof(*h));
     h->sock = -1;
     g_set_cookie[0] = 0;
+    if (aborted()) { if (err && errlen > 0) snprintf(err, (size_t)errlen, "offline or network dialog"); return -4; }
 
     if (err && errlen > 0) err[0] = 0;
     snprintf(cur, sizeof(cur), "%s", url);
@@ -1956,14 +2145,14 @@ void http_close(Http *h)
 
     /* 完整读完的 keep-alive 连接放回池子，下次同一域名直接复用，
      * 省掉 PSP 上最贵的 TCP 握手 + DNS。 */
-    if (h->keep_alive && h->finished && !h->reused_broken &&
+    if (!g_offline && !g_dialog_reserved && h->keep_alive && h->finished && !h->reused_broken &&
         h->bpos == h->blen &&
         (h->status == 200 || h->status == 206) && h->sock >= 0) {
         ka_put(h->host, h->port, h->sock);
         h->sock = -1;
         return;
     }
-    close(h->sock);
+    tracked_close(h->sock);
     h->sock = -1;
 }
 
@@ -1990,6 +2179,7 @@ int http_read(Http *h, char *dst, int len, int idle_ms,
     int out = 0;
     unsigned int t0 = sceKernelGetSystemTimeLow();
 
+    if (aborted()) return -3;
     if (!h || h->sock < 0) return -2;
     if (h->finished) return 0;
 

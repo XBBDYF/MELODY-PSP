@@ -27,6 +27,8 @@ PRE = r'''
 #include <stdio.h>
 #include <string.h>
 struct in_addr { unsigned int s_addr; };
+static int g_offline,g_dialog_reserved;
+static int network_blocked(void){return g_offline || g_dialog_reserved;}
 static int lookup_result, creates, starts, deletes;
 static unsigned now;
 static unsigned sceKernelGetSystemTimeLow(void){return now;}

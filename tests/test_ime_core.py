@@ -139,5 +139,5 @@ c = OUT / "test.c"
 c.write_text(HARNESS, encoding="utf-8")
 exe = OUT / "test.exe"
 subprocess.run(["D:/msys64/ucrt64/bin/gcc.exe", "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror",
-                "-I", str(ROOT / "src"), str(c), str(ROOT / "src/ime.c"), "-o", str(exe)], check=True)
+                "-I", str(ROOT / "src"), str(c), str(ROOT / "src/ime.c"), str(ROOT / "src/ime_pack.c"), "-o", str(exe)], check=True)
 subprocess.run([str(exe)], check=True)

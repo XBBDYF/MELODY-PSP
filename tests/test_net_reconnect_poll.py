@@ -1,12 +1,13 @@
 """Cooperative reconnect kicks apctl without blocking the download worker."""
 from pathlib import Path
 import subprocess,tempfile
+from net_fixture import owned_function, CONTROL_STUB
 R=Path(__file__).resolve().parents[1]
 s=(R/'src/net.c').read_text(encoding='utf-8')
 a=s.index('int net_reconnect_poll(') if 'int net_reconnect_poll(' in s else -1
 assert a>=0,'download worker needs a nonblocking reconnect entry point'
 b=s.index('\nint net_reconnect(',a)
-fn=s[a:b]
+fn=CONTROL_STUB+owned_function(s,'net_reconnect_poll')
 pre=r'''
 #include <assert.h>
 #include <stdio.h>

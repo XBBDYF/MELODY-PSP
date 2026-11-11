@@ -8,7 +8,7 @@
 #define APP_DIR   "./"
 #define APP_TITLE "MELODY"
 #define APP_VER   "4.1.1"
-#define MELODY_SETTINGS_COUNT 28
+#define MELODY_SETTINGS_COUNT 30
 
 #define MAX_SONGS 600          /* 列表上限（歌单按页加载，600 首约占 260KB 静态内存） */
 #define MAX_CARDS  24

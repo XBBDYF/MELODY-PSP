@@ -1,6 +1,13 @@
 #ifndef MELODY_POWER_RUNTIME_H
 #define MELODY_POWER_RUNTIME_H
 void power_runtime_init(void);
+/* Theme-owned policy: 0 manual, 1 eco, 2 ultra-local. User manual config is untouched. */
+void power_runtime_set_profile(int profile);
+int power_runtime_profile(void);
+int power_runtime_locked(void);
+int power_runtime_ultra(void);
+int power_runtime_set_ultra_clock(int mhz);
+void power_runtime_ultra_interactive(int active);
 void power_runtime_shutdown(void);
 int power_runtime_tick(unsigned now_ms,int input,int movie,int busy,int keep_awake);
 int power_runtime_render_due(unsigned now_ms,int movie);

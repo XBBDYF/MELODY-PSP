@@ -1,4 +1,45 @@
 # 拼音词库：word|pinyin(连写,无声调)|freq(1-9)
+# Explicit whole-word readings: shi jian; do not infer these from character defaults.
+初音|chuyin|9
+初音未来|chuyinweilai|9
+镜音铃|jingyinling|8
+镜音连|jingyinlian|8
+巡音流歌|xunyinliuge|8
+洛天依|luotianyi|8
+乐正绫|yuezhengling|8
+虚拟歌手|xunigeshou|7
+千本樱|qianbenying|8
+世界第一公主|shijiediyigongzhu|8
+时间|shijian|9
+事件|shijian|8
+实践|shijian|7
+视奸|shijian|6
+世界|shijie|9
+事情|shiqing|9
+实际|shiji|8
+视频|shipin|8
+实现|shixian|8
+重庆|chongqing|8
+重新|chongxin|8
+重复|chongfu|7
+重量|zhongliang|7
+银行|yinhang|8
+行业|hangye|8
+行为|xingwei|8
+行走|xingzou|7
+快乐|kuaile|8
+长大|zhangda|8
+长江|changjiang|8
+长安|changan|8
+朝阳|chaoyang|7
+朝代|chaodai|7
+朝夕|zhaoxi|7
+了解|liaojie|8
+觉得|juede|8
+睡觉|shuijiao|8
+角色|juese|8
+还原|huanyuan|7
+还有|haiyou|8
 # freq 越大越靠前；同一读音的候选按 freq 降序
 中国|zhongguo|9
 音乐|yinyue|9

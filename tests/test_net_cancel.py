@@ -13,6 +13,7 @@ pre=r'''
 #include <errno.h>
 #include <stdio.h>
 typedef int SceUID;
+static int g_offline, g_dialog_reserved;
 static int thread_id=1, calls;
 static unsigned clock_us;
 static volatile int generation=7;

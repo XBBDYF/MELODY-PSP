@@ -77,9 +77,18 @@
       "id": "eco",
       "name": "ECO 轻量省电",
       "author": "MELODY",
-      "version": "1.0",
-      "description": "无动画、无封面；省电/背光超时/SoC时钟可在主题设置调整，MV自动恢复性能档",
+      "version": "2.0",
+      "description": "皮肤接管省电222MHz/60秒息屏，性能设置锁定；支持四种配色。退出该皮肤恢复手动设置。",
       "script": true,
+      "preview": false
+    },
+    {
+      "id": "ultra",
+      "name": "极致省电 · 本地音乐",
+      "author": "MELODY",
+      "version": "1.0",
+      "description": "离线本地MP3、无封面无动画、静态歌词，CPU133MHz；设置仅退出此皮肤。低频连续播放待真机验证。",
+      "script": false,
       "preview": false
     }
   ]

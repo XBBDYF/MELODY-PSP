@@ -40,7 +40,7 @@ class RestoredSkinTests(unittest.TestCase):
         ids = [item['id'].lower() for item in current['skins']]
         self.assertEqual(len(ids), len(set(ids)))
         self.assertIn('daylight',ids);self.assertIn('night',ids);self.assertNotIn('metro_day',ids)
-        self.assertIn('xmb',ids);self.assertEqual(len(current['skins']), len(before['skins']) + 4)
+        self.assertIn('xmb',ids);self.assertEqual(len(current['skins']), len(before['skins']) + 5)
         for entry in (x for x in current['skins']if x['id']in('daylight','night')):
             self.assertIs(entry['script'], False)
             self.assertIs(entry['preview'], True)

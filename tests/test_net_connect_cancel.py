@@ -21,6 +21,7 @@ typedef struct {int sock;} Http;
 #undef FD_ISSET
 #define FD_ISSET(s,f) ((void)(s),(f)->fd_count>0)
 #define SO_NONBLOCK 0x1009
+static int g_offline, g_dialog_reserved;
 static int thread_id=1,closed,selects;
 static unsigned clock_us;
 static volatile int generation=7;
@@ -39,6 +40,8 @@ static int fake_getsockopt(int s,int l,int o,void*v,socklen_t*n){(void)s;(void)l
 static int fake_getpeername(int s,struct sockaddr*a,socklen_t*n){(void)s;(void)a;(void)n;return -1;}
 static int fake_close(int s){(void)s;closed++;return 0;}
 static unsigned short fake_short(unsigned short n){return n;}
+#define tracked_socket fake_socket
+#define tracked_close fake_close
 #define socket fake_socket
 #define setsockopt fake_setsockopt
 #define connect fake_connect

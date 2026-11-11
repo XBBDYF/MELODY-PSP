@@ -30,6 +30,16 @@ prefix=r'''
 #define C_BLACK 0
 #define C_WHITE 1
 #define C_PANEL 2
+#define C_PANEL2 2
+#define C_ACC 3
+#define FS_SM 0
+static int power_runtime_eco(void){return 0;}
+static int power_runtime_ultra(void){return 0;}
+static int power_runtime_locked(void){return 0;}
+static void overclock_dialog_draw(void){}
+static void gfx_fill_rect(int x,int y,int w,int h,int c){(void)x;(void)y;(void)w;(void)h;(void)c;}
+static void gfx_text(int f,int x,int y,const char*t,int c){(void)f;(void)x;(void)y;(void)t;(void)c;}
+
 static struct{float time,enter,spinner;int screen,busy,busy_x,confirm_clear,upd_dlg,has_now,menu_open,connecting;int now;}g_app;
 static int g_list;static int g_cache_view[1],g_cache_view_n;
 static int g_cache_view_first;

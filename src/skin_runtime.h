@@ -6,7 +6,7 @@
 #define SKIN_WIDGET_MAX 96
 #define SKIN_PAGE_COUNT SC_COUNT
 /* Page renderers are feature modules; downloaded skin code only chooses/draws/views them. */
-typedef struct{unsigned short colors[SKIN_COLOR_COUNT];unsigned color_mask;int dark,hide_mini,hide_status,hide_transition;char id[33],name[64],author[64],version[24],description[192],root[256];}SkinStyle;
+typedef struct{unsigned short colors[SKIN_COLOR_COUNT];unsigned color_mask;int dark,hide_mini,hide_status,hide_transition,power_profile;char id[33],name[64],author[64],version[24],description[192],root[256];}SkinStyle;
 typedef struct{const char*name;int (*draw)(int x,int y,int w,int h);int (*input)(unsigned pressed,unsigned held,float dt);}SkinModule;
 void skin_runtime_init(void);
 int skin_runtime_validate(const char*root,char*err,int errlen);

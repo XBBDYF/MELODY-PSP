@@ -37,6 +37,7 @@ unsigned short gfx_rgb(int r, int g, int b);
 unsigned short gfx_lerp565(unsigned short a, unsigned short b, int t); /* t:0..256 */
 
 void gfx_init(void);
+void gfx_set_present_overlay(void (*draw)(void));
 void gfx_flip(void);
 void gfx_set_brightness(int level); /* 0..16，整屏压暗（转场用） */
 

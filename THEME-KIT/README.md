@@ -1,3 +1,5 @@
+> 2026-11-11后续：省电皮肤`power_profile`将锁定全局性能选项；ECO支持配色，极致模式本地/缓存与歌词/封面开关。见[09-POWER-PROFILES.md](09-POWER-PROFILES.md)。独立词库见[10-IME-PACK.md](10-IME-PACK.md)。
+
 # MELODY 主题制作包（THEME-KIT）
 
 > 面向两类人：**人类主题作者** 和 **AI 助手**。

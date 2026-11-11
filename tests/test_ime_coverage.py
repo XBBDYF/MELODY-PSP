@@ -23,7 +23,7 @@ int main(void){
 }
 '''
 (O/'test.c').write_text(code,encoding='utf-8')
-subprocess.run(['D:/msys64/ucrt64/bin/gcc.exe','-std=c11','-Wall','-Wextra','-Werror','-I'+str(R/'src'),str(O/'test.c'),str(R/'src/ime.c'),'-o',str(O/'test.exe')],check=True)
+subprocess.run(['D:/msys64/ucrt64/bin/gcc.exe','-std=c11','-Wall','-Wextra','-Werror','-I'+str(R/'src'),str(O/'test.c'),str(R/'src/ime.c'),str(R/'src/ime_pack.c'),'-o',str(O/'test.exe')],check=True)
 subprocess.run([str(O/'test.exe')],check=True)
 s=(R/'src/skin_runtime.c').read_text(encoding='utf-8')
 assert 'int n=ime_candidate_count();if(n>6)' not in s, 'Theme model must not truncate the candidate list'

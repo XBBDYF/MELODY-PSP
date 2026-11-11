@@ -58,9 +58,29 @@ int main(void){
  backlight_result=0;backlight=-1;power_runtime_init();
  assert(power_runtime_set("timeout",30)==0);assert(backlight==-1);
  power_runtime_shutdown();
+ backlight=180;power_runtime_init();
+ int manual_clock=power_runtime_clock(),manual_timeout=power_runtime_timeout();
+ power_runtime_set_profile(1);
+ assert(power_runtime_locked()&&power_runtime_eco()&&!power_runtime_ultra());
+ assert(power_runtime_set("clock",333)==-2);
+ assert(power_runtime_cycle(25,1)==-2);
+ assert(power_runtime_theme_option("system_clock",3)==-2);
+ power_runtime_set_profile(2);
+ assert(power_runtime_ultra()&&power_runtime_clock()==133&&power_runtime_timeout()==30);
+ power_runtime_ultra_interactive(1);power_runtime_tick(30008,0,0,0,0);assert(cpu==222);
+ power_runtime_ultra_interactive(0);power_runtime_tick(30008,0,0,0,0);assert(cpu==133);
+ assert(power_runtime_set_ultra_clock(100)==0);power_runtime_tick(30009,0,0,1,0);assert(cpu==100);
+ assert(power_runtime_set_ultra_clock(80)==0);power_runtime_tick(30009,0,0,1,0);assert(cpu==80);
+ assert(power_runtime_set_ultra_clock(66)==0);power_runtime_tick(30009,0,0,1,0);assert(cpu==66);
+ assert(power_runtime_set_ultra_clock(1)<0);
+ assert(power_runtime_set_ultra_clock(133)==0);
+ power_runtime_tick(30010,0,0,1,0);assert(cpu==133);
+ power_runtime_set_profile(0);
+ assert(!power_runtime_locked()&&power_runtime_clock()==manual_clock&&power_runtime_timeout()==manual_timeout);
+ power_runtime_shutdown();
  puts("PASS power adapter: config roundtrip, native timer, fallback, wake, video clock, restore");
 }
 '''
 (O/'test.c').write_text(code,encoding='utf-8')
-subprocess.run(['D:/msys64/ucrt64/bin/gcc.exe','-std=c11','-Wall','-Wextra','-Werror','-I'+str(O),'-I'+str(R/'src'),str(O/'test.c'),str(R/'src/power_runtime.c'),'-o',str(O/'test.exe')],check=True)
+subprocess.run(['D:/msys64/ucrt64/bin/gcc.exe','-std=c11','-Wall','-Wextra','-Werror','-I'+str(O),'-I'+str(R/'src'),str(O/'test.c'),str(R/'src/power_runtime.c'),str(R/'src/overclock_bridge.c'),'-o',str(O/'test.exe')],check=True)
 with tempfile.TemporaryDirectory() as td:subprocess.run([str(O/'test.exe')],cwd=td,check=True)

@@ -3324,6 +3324,7 @@ static int image_request_current(const ImageRequest *r, int avatar)
 static int image_batch_lock(void)
 {
     while (!g_quit) {
+        if(net_offline()){sceKernelDelayThread(100000);continue;}
         if (lock_take(g_lock)) return 1;
         sceKernelDelayThread(1000);
     }
@@ -3844,6 +3845,7 @@ static void job_lyric(const Song *song)
 
 static void job_art(const Song *song)
 {
+    if(net_offline())return;
     if (load_art(song) == 0) post(EV_ART_OK, 0, "");
 }
 
@@ -4828,6 +4830,7 @@ static int worker(SceSize args, void *argp)
     if(directory_result<0)mlog("api: bind file directory failed result=0x%08X",directory_result);
 
     while (!g_quit) {
+        if(net_offline()){g_busy=0;sceKernelDelayThread(100000);continue;}
         int job = JOB_NONE;
         int arg = 0;
         char query[128];
@@ -4994,6 +4997,7 @@ static void job_fill(JobItem *it, int job, int arg, const char *query, const Son
 
 static void queue_job(int job, int arg, const char *query, const Song *song)
 {
+    if(net_offline())return;
     LOCK(g_lock, 1, NULL);
 
     if (job == JOB_CONNECT || job == JOB_PLAY || job == JOB_SEARCH || job==JOB_SEARCH_CATEGORY || job==JOB_SEARCH_OPEN) {
@@ -5558,7 +5562,7 @@ void api_init(void)
         if (g_thumbs[i].state == 1) { g_thumbs[i].state = 0; g_thumbs[i].url[0] = 0; }
     for (int i = 0; i < AV_MAX; ++i)
         if (g_avs[i].state == 1) { g_avs[i].state = 0; g_avs[i].url[0] = 0; }
-    home_thumbs_restore();
+    if(!net_offline())home_thumbs_restore();
 
     api_step("malloc");
     g_buf = (char *)malloc(BUF_SIZE);

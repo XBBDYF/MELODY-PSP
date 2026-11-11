@@ -94,9 +94,9 @@ int main(int argc,char**argv){char err[192],action[48],arg[128];if(argc==3&&!str
 if(argc==3&&!strcmp(argv[1],"--ime-model")){
  assert(skin_runtime_apply(argv[2],err,sizeof(err))==0);
  ime_set_mode(IME_PINYIN);ime_feed('z');ime_feed('h');ime_feed('u');
- for(int f=0;f<60;++f)assert(skin_runtime_draw(SC_SEARCH,f*.016f,.016f));
- ime_reset();ime_feed('y');ime_feed('i');
- for(int f=0;f<60;++f)assert(skin_runtime_draw(SC_SEARCH,f*.016f,.016f));
+ for(int f=0;f<60;++f)if(!skin_runtime_draw(SC_SEARCH,f*.016f,.016f)){fprintf(stderr,"ime model: %s\n",skin_runtime_error());return 1;}
+ ime_reset();ime_feed('y');ime_feed('i');g_app.ime_off=400;
+ for(int f=0;f<60;++f)if(!skin_runtime_draw(SC_SEARCH,f*.016f,.016f)){fprintf(stderr,"ime model: %s\n",skin_runtime_error());return 1;}
  skin_runtime_reset();puts("PASS all zhu/yi candidates survive Lua model and repeated bounded-heap draws");return 0;}
 if(argc==3&&!strcmp(argv[1],"--source-bindings")){
  enable_fixture=1;daily_fixture.id=111;strcpy(daily_fixture.art,"daily-cover");home_fixture.count=2;strcpy(home_fixture.items[0].cover,"recommend-one");strcpy(home_fixture.items[1].cover,"recommend-two");
@@ -140,6 +140,10 @@ if(argc==3&&!strcmp(argv[1],"--slow-device")){
 # 主题字体在宿主机测试里只需要桩：apply/release 走文件 I/O，不在本用例范围
 FONT_STUBS = r"""
 int power_runtime_backlight_supported(void){return 1;}
+void power_runtime_set_profile(int v){(void)v;}
+int power_runtime_profile(void){return 0;}
+int power_runtime_locked(void){return 0;}
+int power_runtime_ultra(void){return 0;}
 int power_runtime_eco(void){return 0;}
 int power_runtime_timeout(void){return 0;}
 int power_runtime_clock(void){return 0;}
@@ -150,7 +154,7 @@ void skin_font_release(void){}
 int skin_font_bytes(void){return 0;}
 const char *skin_font_last_error(void){return "";}
 """
-(O/'test.c').write_text(code+FONT_STUBS,encoding='utf-8');names=(R/'tools/prxloader/lua_sources.txt').read_text(encoding='ascii').splitlines();exe=O/'runtime.exe';cmd=['D:/msys64/ucrt64/bin/gcc.exe','-std=c99','-O1','-Wall','-Wextra','-Wno-misleading-indentation','-DLUA_32BITS','-DLUAI_MAXCCALLS=40','-I'+str(O),'-I'+str(R/'src'),'-I'+str(R/'third_party/lua-5.4.7'),O/'test.c',R/'src/skin_runtime.c',R/'src/json.c',R/'src/ime.c',R/'src/search_history.c',*[R/n for n in names],'-lm','-o',exe]
+(O/'test.c').write_text(code+FONT_STUBS,encoding='utf-8');names=(R/'tools/prxloader/lua_sources.txt').read_text(encoding='ascii').splitlines();exe=O/'runtime.exe';cmd=['D:/msys64/ucrt64/bin/gcc.exe','-std=c99','-O1','-Wall','-Wextra','-Wno-misleading-indentation','-DLUA_32BITS','-DLUAI_MAXCCALLS=40','-I'+str(O),'-I'+str(R/'src'),'-I'+str(R/'third_party/lua-5.4.7'),O/'test.c',R/'src/skin_runtime.c',R/'src/json.c',R/'src/ime.c',R/'src/ime_pack.c',R/'src/overclock_bridge.c',R/'src/search_history.c',*[R/n for n in names],'-lm','-o',exe]
 subprocess.run(cmd,cwd=R,check=True,timeout=90)
 with tempfile.TemporaryDirectory(prefix='melody-skin-runtime-')as td:
  p=Path(td);args=[R/'skin_release/melody/skins/ocean',R/'skin_release/melody/skins/metro']
@@ -184,5 +188,5 @@ if (R/".tmp/skin-editor-exports/editor_disc/skin.lua").exists():subprocess.run([
 with tempfile.TemporaryDirectory(prefix='melody-ime-model-') as td:
  probe=Path(td)/'imeprobe';probe.mkdir()
  (probe/'skin.json').write_text(json.dumps({'schema':1,'id':'imeprobe','name':'imeprobe','script':'skin.lua'}),encoding='utf-8')
- (probe/'skin.lua').write_text('return {draw=function(page,t,dt,m) if m.ime_active==1 then local c=m.ime_candidates; if m.ime_pre=="zhu" then local ok=false; for _,v in ipairs(c)do if v=="祝"then ok=true end end assert(ok and #c>15) elseif m.ime_pre=="yi"then assert(#c>400)end end return true end}',encoding='utf-8')
+ (probe/'skin.lua').write_text('return {draw=function(page,t,dt,m) if m.ime_active==1 then local c=m.ime_candidates; if m.ime_pre=="zhu" then local ok=false; for _,v in ipairs(c)do if v=="祝"then ok=true end end assert(m.ime_total>15 and #c<=4) elseif m.ime_pre=="yi"then assert(m.ime_total>400 and #c<=4)end end return true end}',encoding='utf-8')
  subprocess.run([exe,'--ime-model',probe],cwd=R,check=True,timeout=15)

@@ -2,20 +2,16 @@
 from pathlib import Path
 import subprocess
 import tempfile
+from net_fixture import function as extract_function, owned_function, CONTROL_STUB
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / "src/net.c").read_text(encoding="utf-8")
 
 
 def function(name):
-    start = SOURCE.index(f"int {name}(")
-    opening = SOURCE.index("{", start)
-    depth = 1
-    end = opening + 1
-    while depth:
-        depth += (SOURCE[end] == "{") - (SOURCE[end] == "}")
-        end += 1
-    return SOURCE[start:end]
+    if name == 'net_apctl_disconnect':
+        return extract_function(SOURCE, name)
+    return owned_function(SOURCE, name)
 
 
 PRE = r'''
@@ -26,6 +22,7 @@ PRE = r'''
 #define PSP_NET_APCTL_STATE_JOINING 2
 #define PSP_NET_APCTL_STATE_GETTING_IP 3
 #define PSP_NET_APCTL_STATE_GOT_IP 4
+static int aborted(void){return 0;}
 static int g_net_ok=1, g_last_profile=1, g_reconnecting;
 static unsigned g_last_reconn_us, clock_us=100,g_auto_association_us;
 static int g_auto_association_owned;
@@ -71,6 +68,6 @@ with tempfile.TemporaryDirectory(prefix="net-intent-") as directory:
     functions = "\n".join(function(name) for name in (
         "net_apctl_connect", "net_reconnect_poll", "net_reconnect", "net_apctl_disconnect"
     ))
-    c_file.write_text(PRE + functions + MAIN, encoding="utf-8")
+    c_file.write_text(PRE + CONTROL_STUB + functions + MAIN, encoding="utf-8")
     subprocess.run(["D:/msys64/ucrt64/bin/gcc.exe", "-std=c11", "-O0", "-Wall", "-Wextra", "-Werror", str(c_file), "-o", str(executable)], check=True)
     subprocess.run([str(executable)], check=True)

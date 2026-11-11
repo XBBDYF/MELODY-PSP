@@ -18,6 +18,15 @@
 #define NET_POOL_SIZE   (768 * 1024)   /* 4~6 条下载连接 × 64KB + API + 封面 */
 #define NET_APCTL_STACK 0x8000
 
+/* Main-thread final network gate. Offline shuts down all owned sockets;
+ * workers observe cancellation and close their own descriptors. */
+void net_set_offline(int offline);
+int net_offline(void);
+/* Nonblocking utility reservation: 1 acquired, 0 wait for workers, <0 denied.
+ * begin revokes new HTTP/DNS/APCTL work immediately; end releases reservation. */
+int net_dialog_begin(void);
+void net_dialog_end(int connected);
+
 int net_init(void);
 int net_speed_kbps(void);
 int net_peak_speed_kbps(void);

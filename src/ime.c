@@ -5,10 +5,16 @@
  *   - 拼音键是「无声调全拼连写」，所以不需要切分音节，前缀匹配即可；
  *   - 日语先做罗马字→平假名（确定性），再用读音在词库里查汉字候选；
  *     不做分词/Viterbi，词条级匹配够用于搜索框；
- *   - 一切缓冲固定大小，按键路径上零分配。
+ *   - 候选保存紧凑索引；文本仅按可见窗口读取，详见 docs/IME-PACK.md。
  */
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include "ime_pack.h"
+#ifdef __PSP__
+#include <pspiofilemgr.h>
+#endif
 #include "ime.h"
 #include "ime_dict.h"
 
@@ -17,7 +23,13 @@
 static int g_mode = IME_PINYIN;
 static char g_pre[IME_PRE_MAX];       /* 拼音：字母；假名：罗马字缓冲 */
 static char g_kana[IME_PRE_MAX];      /* 假名：已转换的平假名（UTF-8） */
-static char g_cand[CAND_MAX][IME_WORD_MAX];
+typedef struct { uint32_t id, score; } CandidateRef;
+static CandidateRef *g_refs;
+static int g_ref_cap, g_counting, g_needed;
+static unsigned char g_seen_chars[8192];
+static char g_cand[8][IME_WORD_MAX];
+static char g_kata[IME_PRE_MAX];
+static ImePack *g_pack;
 static int  g_cand_n;
 static char g_last[IME_PRE_MAX];
 
@@ -172,154 +184,80 @@ static void hira_to_kata(const char *src, char *out, int cap)
 /* 候选                                                                */
 /* ------------------------------------------------------------------ */
 
-static void cand_clear(void)
-{
-    g_cand_n = 0;
+
+static void cand_clear(void) { g_cand_n=0; }
+static int dictionary_count(int kind) {
+ if(g_pack) return (int)ime_pack_count(g_pack,kind);
+ return kind==0?k_ime_pinyin_count:kind==1?k_ime_kana_count:0;
 }
-
-static int cand_has(const char *w)
-{
-    for (int i = 0; i < g_cand_n; ++i)
-        if (!strcmp(g_cand[i], w)) return 1;
-    return 0;
+static int dictionary_read(int kind,int i,ImePackEntry *e) {
+ if(g_pack) return !ime_pack_read(g_pack,kind,(unsigned)i,e);
+ if(kind==2) {
+  int group=i>>16,offset=i&65535;
+  if(group<0||group>=k_ime_chars_count||offset>=(int)strlen(k_ime_chars[group].chars)) return 0;
+  const char *w=k_ime_chars[group].chars+offset;
+  int n=((unsigned char)*w<128)?1:((unsigned char)*w<224)?2:((unsigned char)*w<240)?3:4;
+  snprintf(e->key,sizeof(e->key),"%s",k_ime_chars[group].key);
+  memcpy(e->word,w,(size_t)n);e->word[n]=0;e->freq=65535u-(unsigned)offset;e->kind=2;return 1;
+ }
+ if(kind<0||kind>1||i<0||i>=dictionary_count(kind)) return 0;
+ const ImeEntry *r=kind==0?&k_ime_pinyin[i]:&k_ime_kana[i];
+ snprintf(e->key,sizeof(e->key),"%s",r->key);snprintf(e->word,sizeof(e->word),"%s",r->word);e->freq=r->freq;e->kind=(unsigned)kind;return 1;
 }
-
-static void cand_add(const char *w)
-{
-    if (!w || !w[0]) return;
-    if (strlen(w) >= IME_WORD_MAX) return;
-    if (g_cand_n >= CAND_MAX) return;
-    if (cand_has(w)) return;
-    snprintf(g_cand[g_cand_n++], IME_WORD_MAX, "%s", w);
+static void dictionary_range(int kind,const char *key,int *lo,int *hi) {
+ int a=0,b=dictionary_count(kind),kl=(int)strlen(key);ImePackEntry e;
+ while(a<b) { int m=a+(b-a)/2; if(!dictionary_read(kind,m,&e)) { *lo=*hi=0;return; } if(strncmp(e.key,key,(size_t)kl)<0)a=m+1;else b=m; }
+ *lo=a;b=dictionary_count(kind);
+ while(a<b) { int m=a+(b-a)/2;if(!dictionary_read(kind,m,&e)){*lo=*hi=0;return;}if(strncmp(e.key,key,(size_t)kl)<=0)a=m+1;else b=m; }
+ *hi=a;
 }
-
-/* 从有序表里取 [lo,hi)：key 前缀区间 */
-static void range(const ImeEntry *tab, int n, const char *key, int *lo, int *hi)
-{
-    int a = 0, b = n, kl = (int)strlen(key);
-
-    while (a < b) {
-        int mid = (a + b) / 2;
-
-        if (strncmp(tab[mid].key, key, (size_t)kl) < 0) a = mid + 1;
-        else b = mid;
-    }
-    *lo = a;
-    b = n;
-    while (a < b) {
-        int mid = (a + b) / 2;
-
-        if (strncmp(tab[mid].key, key, (size_t)kl) <= 0) a = mid + 1;
-        else b = mid;
-    }
-    *hi = a;
+static void ref_add(int kind,unsigned int id,uint32_t score) {
+ if(g_counting) { ++g_needed;return; }
+ if(g_cand_n<g_ref_cap) { g_refs[g_cand_n].id=((unsigned)kind<<30)|id;g_refs[g_cand_n++].score=score; }
 }
-
-/* 收集前缀（或完全匹配）候选，按频率降序插入，再按顺序进候选表 */
-static void collect(const ImeEntry *tab, int n, const char *key, int exact_only)
-{
-    int lo, hi, i, k, kl = (int)strlen(key);
-    const ImeEntry *picked[32];
-    int picked_n = 0;
-
-    range(tab, n, key, &lo, &hi);
-    /* Scan the complete prefix interval; do not discard frequent later entries. */
-    for (i = lo; i < hi; ++i) {
-        int pos;
-
-        if (exact_only) {
-            if (strcmp(tab[i].key, key)) continue;
-        } else if (strncmp(tab[i].key, key, (size_t)kl)) {
-            continue;
-        }
-
-        pos = picked_n < 32 ? picked_n : 32;
-        while (pos > 0 && (picked[pos - 1]->freq < tab[i].freq ||
-                           (picked[pos - 1]->freq == tab[i].freq &&
-                            strcmp(picked[pos - 1]->key, tab[i].key) > 0))) {
-            if (pos < 32) picked[pos] = picked[pos - 1];
-            pos--;
-        }
-        if (pos < 32) {
-            picked[pos] = &tab[i];
-            if (picked_n < 32) picked_n++;
-        }
-    }
-    for (k = 0; k < picked_n; ++k) cand_add(picked[k]->word);
+static int ref_compare(const void *a,const void *b) {
+ const CandidateRef *x=(const CandidateRef*)a,*y=(const CandidateRef*)b;
+ if(x->score!=y->score)return x->score>y->score?-1:1;
+ return x->id<y->id?-1:x->id>y->id;
 }
-
-/* 结尾孤立的 n 在提交时才转成 ん（避免 "na" 被拆成 ん+あ） */
-/* 单字候选：key 是音节。exact=1 只要同音节，exact=0 收以 prefix 开头的音节。 */
-static void char_candidates(const char *prefix, int exact, int max)
-{
-    int lo, hi, i, added = 0, kl = (int)strlen(prefix);
-
-    if (!prefix[0] || max <= 0) return;
-    {
-        int a = 0, b = k_ime_chars_count;
-
-        while (a < b) {
-            int mid = (a + b) / 2;
-
-            if (strncmp(k_ime_chars[mid].key, prefix, (size_t)kl) < 0) a = mid + 1;
-            else b = mid;
-        }
-        lo = a;
-        b = k_ime_chars_count;
-        while (a < b) {
-            int mid = (a + b) / 2;
-
-            if (strncmp(k_ime_chars[mid].key, prefix, (size_t)kl) <= 0) a = mid + 1;
-            else b = mid;
-        }
-        hi = a;
-    }
-
-    for (i = lo; i < hi && added < max; ++i) {
-        const char *c = k_ime_chars[i].chars;
-
-        if (exact && strcmp(k_ime_chars[i].key, prefix)) continue;
-        while (*c && added < max) {
-            char one[8];
-            int n = 1;
-
-            if ((*c & 0xE0) == 0xC0) n = 2;
-            else if ((*c & 0xF0) == 0xE0) n = 3;
-            else if ((*c & 0xF8) == 0xF0) n = 4;
-            memcpy(one, c, (size_t)n);
-            one[n] = 0;
-            cand_add(one);
-            c += n;
-            added++;
-        }
-    }
+static void collect(int kind,const char *key) {
+ int lo,hi;ImePackEntry e;dictionary_range(kind,key,&lo,&hi);
+ for(int i=lo;i<hi;i++) if(dictionary_read(kind,i,&e)) {
+  uint32_t stage=!strcmp(e.key,key)?0x30000000u:0x10000000u;
+  ref_add(kind,(unsigned)i,stage+(e.freq>0x0fffffffu?0x0fffffffu:e.freq));
+ }
 }
-
-/* 词库里的首字：输入单字母时给几个「相关单字」而不是只有整词 */
-static void word_initial_candidates(const char *prefix, int max)
-{
-    int lo, hi, i, added = 0, kl = (int)strlen(prefix);
-
-    if (!prefix[0] || max <= 0) return;
-    range(k_ime_pinyin, k_ime_pinyin_count, prefix, &lo, &hi);
-    for (i = lo; i < hi && added < max; ++i) {
-        const char *w = k_ime_pinyin[i].word;
-        char one[8];
-        int n = 1;
-
-        if (!w[0]) continue;
-        if ((*w & 0xE0) == 0xC0) n = 2;
-        else if ((*w & 0xF0) == 0xE0) n = 3;
-        else if ((*w & 0xF8) == 0xF0) n = 4;
-        if (n == 1) continue;                 /* 跳过 ASCII */
-        memcpy(one, w, (size_t)n);
-        one[n] = 0;
-        cand_add(one);
-        added++;
-        (void)kl;
-    }
+static void char_add(unsigned int id,const ImePackEntry *e) {
+ const unsigned char *p=(const unsigned char*)e->word;unsigned cp=*p;
+ if(*p>=240)cp=((p[0]&7u)<<18)|((p[1]&63u)<<12)|((p[2]&63u)<<6)|(p[3]&63u);
+ else if(*p>=224)cp=((p[0]&15u)<<12)|((p[1]&63u)<<6)|(p[2]&63u);
+ else if(*p>=192)cp=((p[0]&31u)<<6)|(p[1]&63u);
+ if(cp<65536) { unsigned char bit=(unsigned char)(1u<<(cp&7));if(g_seen_chars[cp>>3]&bit)return;g_seen_chars[cp>>3]|=bit; }
+ ref_add(2,id,0x20000000u+(e->freq>0x0fffffffu?0x0fffffffu:e->freq));
 }
-
+static void char_candidates(const char *prefix) {
+ int kl=(int)strlen(prefix),exact=0;ImePackEntry e;
+ memset(g_seen_chars,0,sizeof(g_seen_chars));
+ if(g_pack) {
+  int lo,hi;dictionary_range(2,prefix,&lo,&hi);
+  for(int i=lo;i<hi;i++) if(dictionary_read(2,i,&e)&&!strcmp(e.key,prefix)){exact=1;break;}
+  for(int i=lo;i<hi;i++) if(dictionary_read(2,i,&e)&&(!exact||!strcmp(e.key,prefix)))char_add((unsigned)i,&e);
+ } else {
+  for(int i=0;i<k_ime_chars_count;i++)if(!strcmp(k_ime_chars[i].key,prefix)){exact=1;break;}
+  for(int i=0;i<k_ime_chars_count;i++) {
+   if(strncmp(k_ime_chars[i].key,prefix,(size_t)kl)||(exact&&strcmp(k_ime_chars[i].key,prefix)))continue;
+   const char *start=k_ime_chars[i].chars,*p=start;
+   while(*p) { unsigned id=((unsigned)i<<16)|(unsigned)(p-start);if(!dictionary_read(2,(int)id,&e))break;char_add(id,&e);p+=strlen(e.word); }
+  }
+ }
+}
+static void build_refs(void) {
+ if(g_mode==IME_PINYIN) { if(!g_pre[0])return;collect(0,g_pre);char_candidates(g_pre); }
+ else if(g_mode==IME_KANA) {
+  if(g_kana[0]) { collect(1,g_kana);ref_add(3,0,3);ref_add(3,1,2); }
+  if(g_pre[0])ref_add(3,2,1);
+ }
+}
 static void rebuild_candidates(void);
 
 static void kana_finish(void)
@@ -334,29 +272,15 @@ static void kana_finish(void)
 
 static void rebuild_candidates(void)
 {
-    cand_clear();
-
-    if (g_mode == IME_PINYIN) {
-        if (!g_pre[0]) return;
-        /* 顺序：整词完全匹配 → 同音节单字（多给几个，可横向滚动）→ 词首字 → 前缀词 */
-        collect(k_ime_pinyin, k_ime_pinyin_count, g_pre, 1);
-        char_candidates(g_pre, 1, CAND_MAX-g_cand_n);
-        if (g_cand_n < 20) word_initial_candidates(g_pre, 6);
-        collect(k_ime_pinyin, k_ime_pinyin_count, g_pre, 0);
-        return;
-    }
-
-    /* 假名模式 */
-    if (g_kana[0]) {
-        char kata[IME_PRE_MAX];
-
-        collect(k_ime_kana, k_ime_kana_count, g_kana, 1);   /* 完全匹配 */
-        if (g_cand_n < CAND_MAX) collect(k_ime_kana, k_ime_kana_count, g_kana, 0); /* 前缀 */
-        cand_add(g_kana);                                 /* 假名本身 */
-        hira_to_kata(g_kana, kata, (int)sizeof(kata));
-        cand_add(kata);                                   /* 片假名 */
-    }
-    if (g_pre[0]) cand_add(g_pre);                        /* 未转换的罗马字/英文 */
+ cand_clear();g_needed=0;g_counting=1;build_refs();g_counting=0;
+ if(g_needed>g_ref_cap) {
+  CandidateRef *next=(CandidateRef*)realloc(g_refs,(size_t)g_needed*sizeof(*g_refs));
+  if(!next)return;
+  g_refs=next;g_ref_cap=g_needed;
+ }
+ build_refs();
+ if(g_cand_n>1)qsort(g_refs,(size_t)g_cand_n,sizeof(*g_refs),ref_compare);
+ hira_to_kata(g_kana,g_kata,sizeof(g_kata));
 }
 
 /* ------------------------------------------------------------------ */
@@ -410,11 +334,65 @@ int ime_candidate_count(void)
     return g_cand_n;
 }
 
+int ime_candidate_total(void) { return g_cand_n; }
 const char *ime_candidate(int i)
 {
-    if (i < 0 || i >= g_cand_n) return "";
-    return g_cand[i];
+ ImePackEntry e;unsigned id,kind;char *out;
+ if(i<0||i>=g_cand_n)return "";
+ id=g_refs[i].id&0x3fffffffu;kind=g_refs[i].id>>30;
+ if(kind==3)return id==0?g_kana:id==1?g_kata:g_pre;
+ out=g_cand[i%8];
+ if(!dictionary_read((int)kind,(int)id,&e)) { out[0]=0;return out; }
+ snprintf(out,IME_WORD_MAX,"%s",e.word);return out;
 }
+int ime_candidate_window(int first,char out[][IME_WORD_MAX],int max)
+{
+ int n=0;if(!out||first<0||max<=0)return 0;
+ while(n<max&&first<g_cand_n){snprintf(out[n++],IME_WORD_MAX,"%s",ime_candidate(first++));}return n;
+}
+void ime_activate_pack(ImePack *prepared)
+{
+ ImePack *old=g_pack;if(prepared==old)return;
+ ime_reset();free(g_refs);g_refs=NULL;g_ref_cap=0;g_pack=prepared;ime_pack_close(old);
+}
+/* Read only a short basename, never a path supplied by a pointer file. */
+static int active_basename(const char *path,char name[81])
+{
+ unsigned char bytes[84];int n;
+#ifdef __PSP__
+ SceUID fd=sceIoOpen(path,PSP_O_RDONLY,0);if(fd<0)return 0;
+ n=sceIoRead(fd,bytes,sizeof(bytes));sceIoClose(fd);
+#else
+ FILE *f=fopen(path,"rb");if(!f)return 0;
+ n=(int)fread(bytes,1,sizeof(bytes),f);if(ferror(f))n=-1;fclose(f);
+#endif
+ if(n<=0||n>82)return 0;
+ if(bytes[n-1]=='\n'){n--;if(n>0&&bytes[n-1]=='\r')n--;}
+ if(n<=0||n>80)return 0;
+ for(int i=0;i<n;i++) {
+  unsigned char c=bytes[i];
+  if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='.'||c=='_'||c=='-'))return 0;
+ }
+ memcpy(name,bytes,(size_t)n);name[n]=0;
+ return strcmp(name,".")&&strcmp(name,"..");
+}
+int ime_load_dictionary(const char *app_dir)
+{
+ char directory[400],path[512],name[81];ImePack *p=NULL;int r;
+ if(!app_dir||snprintf(directory,sizeof(directory),"%s%sime/",app_dir,
+    app_dir[0]&&app_dir[strlen(app_dir)-1]!='/'&&app_dir[strlen(app_dir)-1]!='\\'?"/":"")>=(int)sizeof(directory)) {
+  ime_activate_pack(NULL);return IME_PACK_BOUNDS;
+ }
+ snprintf(path,sizeof(path),"%sactive.txt",directory);
+ if(active_basename(path,name)) {
+  snprintf(path,sizeof(path),"%s%s",directory,name);
+  r=ime_pack_prepare(path,&p);
+  if(!r){ime_activate_pack(p);return 0;}
+ }
+ snprintf(path,sizeof(path),"%scurrent.bin",directory);
+ r=ime_pack_prepare(path,&p);ime_activate_pack(p);return r;
+}
+unsigned int ime_dictionary_revision(void) { return ime_pack_revision(g_pack); }
 
 int ime_feed(int ch)
 {
@@ -500,41 +478,33 @@ int ime_commit_raw(char *out, int cap)
 int ime_select(int i, char *out, int cap)
 {
     if (i < 0 || i >= g_cand_n || cap <= 1) return 0;
-    snprintf(out, (size_t)cap, "%s", g_cand[i]);
-    snprintf(g_last, sizeof(g_last), "%s", g_cand[i]);
+    const char *word=ime_candidate(i);
+    if(!word[0]||strlen(word)>=(size_t)cap)return 0;
+    snprintf(out, (size_t)cap, "%s", word);
+    snprintf(g_last, sizeof(g_last), "%s", word);
     ime_reset();
     return (int)strlen(out);
 }
 
-int ime_assoc(const char *text, char out[][IME_WORD_MAX], int max)
+int ime_assoc(const char *text,char out[][IME_WORD_MAX],int max)
 {
-    const ImeEntry *best[32];
-    int count=0,lo=0,hi=k_ime_pinyin_count,tl,latin=1;
-    if(!text||!text[0]||!out||max<=0)return 0;
-    if(max>32)max=32;
-    tl=(int)strlen(text);
-    for(int i=0;i<tl;++i)if((unsigned char)text[i]>=128)latin=0;
-    if(latin)range(k_ime_pinyin,k_ime_pinyin_count,text,&lo,&hi);
-    else {
-        int a=0,b=k_ime_pinyin_count;
-        while(a<b){int m=(a+b)/2;if(strncmp(k_ime_pinyin[k_ime_assoc_index[m]].word,text,(size_t)tl)<0)a=m+1;else b=m;}
-        lo=a;b=k_ime_pinyin_count;
-        while(a<b){int m=(a+b)/2;if(strncmp(k_ime_pinyin[k_ime_assoc_index[m]].word,text,(size_t)tl)<=0)a=m+1;else b=m;}
-        hi=a;
-    }
-    for(int i=lo;i<hi;++i){
-        const ImeEntry *e=&k_ime_pinyin[latin?i:k_ime_assoc_index[i]];
-        int pos=count<max?count:max;
-        if(!strcmp(e->word,text))continue;
-        while(pos>0&&best[pos-1]->freq<e->freq){if(pos<max)best[pos]=best[pos-1];--pos;}
-        if(pos<max){best[pos]=e;if(count<max)++count;}
-    }
-    for(int i=0;i<count;++i)snprintf(out[i],IME_WORD_MAX,"%s",best[i]->word);
-    for(int i=0;i<k_ime_kana_count&&count<max;++i){
-        const char*w=k_ime_kana[i].word;
-        if(strncmp(w,text,(size_t)tl)||!strcmp(w,text))continue;
-        int dup=0;for(int j=0;j<count;++j)if(!strcmp(out[j],w))dup=1;
-        if(!dup)snprintf(out[count++],IME_WORD_MAX,"%s",w);
-    }
-    return count;
+ uint32_t scores[32];int n=0,latin=1,lo=0,hi;size_t tl;
+ if(!text||!*text||!out||max<=0)return 0;
+ if(max>32)max=32;
+ tl=strlen(text);for(size_t i=0;i<tl;i++)if((unsigned char)text[i]>=128)latin=0;
+ hi=dictionary_count(0);if(latin)dictionary_range(0,text,&lo,&hi);
+ for(int kind=0;kind<2;kind++) {
+  int begin=kind==0?lo:0,end=kind==0?hi:dictionary_count(1);
+  for(int i=begin;i<end;i++) {
+   ImePackEntry e;int pos,dup=0;if(!dictionary_read(kind,i,&e))continue;
+   if((!latin||kind==1)&&strncmp(e.word,text,tl))continue;
+   if(!strcmp(e.word,text))continue;
+   for(int j=0;j<n;j++)if(!strcmp(out[j],e.word))dup=1;
+   if(dup)continue;
+   pos=n<max?n:max;
+   while(pos>0&&scores[pos-1]<e.freq){if(pos<max){scores[pos]=scores[pos-1];memcpy(out[pos],out[pos-1],IME_WORD_MAX);}pos--;}
+   if(pos<max){scores[pos]=e.freq;snprintf(out[pos],IME_WORD_MAX,"%s",e.word);if(n<max)n++;}
+  }
+ }
+ return n;
 }

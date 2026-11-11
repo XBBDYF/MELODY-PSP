@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "id": "ultra",
+  "name": "极致省电 · 本地音乐",
+  "author": "MELODY",
+  "version": "1.0",
+  "description": "离线本地MP3、无封面无动画、静态歌词，CPU133MHz；设置仅退出此皮肤。低频连续播放待真机验证。",
+  "dark": true,
+  "power_profile": "ultra",
+  "colors": {
+    "background": "#000000",
+    "text": "#DDDDDD",
+    "muted": "#888888",
+    "accent": "#78BA8E"
+  }
+}

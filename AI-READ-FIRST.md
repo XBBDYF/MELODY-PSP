@@ -284,3 +284,7 @@ git add -A && git commit -m "修复：<现象>（根因 + 改动）" && git push
 本页是索引，不是代码的替代品。若某条与当前实现不符，先定向核对，再同时更新本页和运行逻辑说明，不要继续传播旧描述。
 
 
+
+词库查看/导出：`tools/export_ime_catalog.py` 校验实际包CRC并生成 `tools/ime/词库可读清单/`。只改清单不影响运行词库，补词来源仍是pinyin.txt/user.txt并重建包。
+
+搜索输入页提示修复（2026-11-11）：Metro/XMB与模板明确显示“□ 切换语言”，输入态L/R不再误提示切分类；tests/test_search_language_hint.py执行真实Lua绘制验证。

@@ -585,3 +585,5 @@ MELODY 以 **GNU General Public License v3.0** 发布，见 [LICENSE](LICENSE)�
 
 
 极致省电列表支持←→每次快移8首，□独立切本地/完整缓存；START选项增加单曲循环。修复普通模式EOF后只seek无法重启已结束decoder、未知时长无法循环，以及极致模式忽略单曲循环直接下一首的问题。回归与模拟器结果单独记录，物理PSP仍需复测。
+
+搜索输入页底栏修复：Metro/XMB显示“□ 切换语言”，XMB输入态不再被固定结果页提示覆盖。

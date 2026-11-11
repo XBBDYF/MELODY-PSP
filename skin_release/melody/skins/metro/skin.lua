@@ -288,7 +288,7 @@ local function search(t,m)
    local x=17+col*45;local w=41;if r==2 and col==7 then w=76 elseif r==2 and col==8 then x=413;w=48 end
    local y=145+r*29;if m.kb_row==r and m.kb_col==col and m.suggest_focused~=1 then ui.rect(x,y,w,25,C.accent)else ui.rect(x,y,w,25,C.soft)end;text(x+9,y+6,w-11,label,0,C.fg)
   end end
-  bar("输入拼音  ○选择  △搜索","× 返回");return end
+  bar("○ 上屏  △ 选词  □ 切换语言","× 返回");return end
  local categories={"歌曲","歌单","专辑","歌手","声音"};for i,v in ipairs(categories)do text(18+(i-1)*88,103,82,v,0,i-1==m.search_kind and C.accent or C.dim)end
  if m.search_state==1 then -- native bottom loading line is the only wait indicator
 

@@ -82,9 +82,9 @@ local function header(title,sub,m)
 end
 local hints={home="←→ 分类   ↑↓ 项目   L/R 快切   ○ 进入",player="SELECT 菜单   □ 喜欢   ↑↓ 音量   × 列表",settings="↑↓ 选择   ←→ 修改   ○ 进入   × 返回",search="L/R 分类   SELECT 多选   × 返回",downloads="L/R 歌曲 / MV   ○ 操作   × 返回",cache="L/R 缓存 / 本地   ○ 播放   × 返回"}
 local selectionFooter=nil
-local function bar(left,right)
+local function bar(left,right,searchEditor)
  local compact={home="←→分类  ↑↓选择  ○进入  ×返回",player="○暂停/继续  L/R切歌  △歌词  SELECT菜单  ×返回",lyrics="○暂停  □译文  L/R切歌  ×返回",songs="○播放  L多选  □勾选  △下载  ×返回",search="○选择/打开  △搜索/编辑  L/R分类  ×返回",downloads="○暂停/继续  SELECT播放  △移除  ×返回",cache="○播放  ←→快移  ×返回",grid="↑↓选择  ○打开  ←→快移  ×返回",square="↑↓选择  ○打开  ←→快移  ×分类",settings="↑↓选择  ←→调整  ○确认  ×返回",mine="↑↓选择  ○打开  △播放  ×返回",account="○账号操作  ×返回"}
- local value=selectionFooter or compact[lastPage]or left or"○进入  ×返回"
+ local value=(searchEditor and left)or selectionFooter or compact[lastPage]or left or"○进入  ×返回"
  if(lastPage=="downloads"and transferFolder)or(lastPage=="cache"and offlineFolder)or(lastPage=="home"and currentFolder)then value="↑↓选择  ○打开文件夹  ←→快移  ×上一级"end
  text(18,254,446,ui.button_hint(value),0,C.fg)
 end
@@ -219,7 +219,7 @@ local function xmbSearch(t,m)
    if m.kb_row==r and m.kb_col==col and m.suggest_focused~=1 then ui.rect(x,y,w,25,C.soft)end
    text(x+9,y+6,w-11,label,0,C.fg)
   end end
-  bar("输入拼音   ○ 选择   △ 搜索","L/R 搜索分类   × 返回");return
+  bar("○上屏 △选词 □ 切换语言 ×返回",nil,true);return
  end
  local kinds={"歌曲","歌单","专辑","歌手","声音"}
  text(24,99,430,"搜索 / "..(kinds[(m.search_kind or 0)+1]or"歌曲"),0,C.dim)

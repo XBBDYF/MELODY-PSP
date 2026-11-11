@@ -55,13 +55,13 @@ int main(void) {
     store_set_disc_player(-1); assert(store_disc_player() == 0);
     store_set_disc_player(1); remove("data.txt"); store_init(); assert(store_disc_player() == 0);
     int seen[MELODY_SETTINGS_COUNT] = {0};
-    assert(MELODY_SETTINGS_COUNT == 25);
+    assert(MELODY_SETTINGS_COUNT == 28);
     for (int row=0; row<MELODY_SETTINGS_COUNT; ++row) {
-        int id=melody_setting_id(row); assert(id>=0 && id<25); assert(!seen[id]++);
+        int id=melody_setting_id(row); assert(id>=0 && id<MELODY_SETTINGS_COUNT); assert(!seen[id]++);
         if(id==3) assert(melody_setting_id(row+1)==22);
         if(id==22) assert(melody_setting_id(row+1)==23);
     }
-    assert(melody_setting_id(-1)==-1 && melody_setting_id(25)==-1);
+    assert(melody_setting_id(-1)==-1 && melody_setting_id(MELODY_SETTINGS_COUNT)==-1);
     puts("PASS real store default/legacy/strict values/roundtrip and stable IDs");
     return 0;
 }

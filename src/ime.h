@@ -20,7 +20,7 @@ enum {
     IME_ASCII = 3        /* 英文直输：字母直接进搜索框，不产生 preedit */
 };
 
-#define IME_MAX_CAND   32   /* 候选一屏放不下，界面做横向滚动窗口 */
+#define IME_MAX_CAND   512   /* 候选一屏放不下，界面做横向滚动窗口 */
 #define IME_PRE_MAX    48
 #define IME_WORD_MAX   24
 

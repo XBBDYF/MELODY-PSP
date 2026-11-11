@@ -8,7 +8,7 @@
 #define APP_DIR   "./"
 #define APP_TITLE "MELODY"
 #define APP_VER   "4.1.1"
-#define MELODY_SETTINGS_COUNT 25
+#define MELODY_SETTINGS_COUNT 28
 
 #define MAX_SONGS 600          /* 列表上限（歌单按页加载，600 首约占 260KB 静态内存） */
 #define MAX_CARDS  24
@@ -179,6 +179,7 @@ enum {
 #define HOME_ITEM_COVER  4
 #define HOME_ITEM_QUICK  14
 #define HOME_ITEM_COUNT  19
+#define APP_ASSOC_MAX    32
 #define APP_CHIP_MAX      6    /* 搜索页：推荐搜索最多几个 */
 #define APP_CHIP_LEN      24
 #define HOME_COVERS      10
@@ -243,7 +244,7 @@ typedef struct {
     int hist_sel;          /* 历史列选中项（0 起） */
     int ime_off;           /* 候选横向滚动窗口起点 */
     int chip_off;          /* 上排（联想/推荐）滚动窗口起点 */
-    char assoc[APP_CHIP_MAX][APP_CHIP_LEN];  /* 上屏后的本地词库联想 */
+    char assoc[APP_ASSOC_MAX][APP_CHIP_LEN];  /* 上屏后的本地词库联想 */
     int assoc_n;
 
     /* 搜索联想 */

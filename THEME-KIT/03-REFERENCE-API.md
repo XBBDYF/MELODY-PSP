@@ -1,3 +1,5 @@
+> 2026-11-11新增电源接口：见 [08-POWER-CONTROLS.md](08-POWER-CONTROLS.md)。原有字段/页面不变；新增 power_* 模型、三个动作以及system_*主题选项。默认不自动套用主题电源设置。
+
 # 参考：字段与 API 全表
 
 > 以 MELODY 4.1.1 的 `src/skin_runtime.c` 为准。表中没列的函数/字段不要用。

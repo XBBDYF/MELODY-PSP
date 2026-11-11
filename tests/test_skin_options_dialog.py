@@ -15,6 +15,9 @@ code=r'''
 #include "pspctrl.h"
 static SkinOption items[2];static SkinStyle style;static int adjusts,lastindex,lastdirection,draws,toasts;
 int skin_options_count(void){return 2;}const SkinOption*skin_options_at(int n){return &items[n];}int skin_options_adjust(int i,int d){adjusts++;lastindex=i;lastdirection=d;items[i].value+=d;return 0;}
+int power_runtime_theme_value(const char*id){(void)id;return -1;}
+int power_runtime_theme_option(const char*id,int v){(void)id;(void)v;return 0;}
+int skin_options_set(int i,int v){items[i].value=v;return 0;}
 void skin_runtime_refresh_palette(void){}void ui_theme_changed(void){}
 const SkinStyle*skin_runtime_style(void){return &style;}void ui_video_palette(UiVideoPalette*p){memset(p,0,sizeof(*p));}void ui_toast(const char*s){assert(s[0]);toasts++;}
 void gfx_reset_clip(void){}unsigned short gfx_rgb(int a,int b,int c){return a+b+c;}

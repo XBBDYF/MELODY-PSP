@@ -14,6 +14,7 @@
  */
 
 #include "ui.h"
+#include "power_runtime.h"
 #include "ime.h"
 #include "search_history.h"
 
@@ -2537,7 +2538,7 @@ static const SetDef g_set_defs[SET_ITEMS] = {
  {0,"音质"},{0,"音量"},{2,"下载并发"},{4,"皮肤中心"},{2,"网络连接"},{4,"内存显示"},
  {3,"清空下载队列"},{3,"清空缓存"},{5,"账号与登录"},{6,"检查更新"},{6,"关于 MELODY"},
  {2,"备用音源"},{1,"视频解码"},{1,"软解画质"},{1,"视频加载"},{1,"软解格式"},
- {1,"MV清晰度"},{1,"提前缓冲"},{6,"公告"},{5,"隐私政策"},{4,"显示网速"},{0,"预下载后续歌曲"},{4,"界面渲染"},{4,"唱片播放器"},{1,"本地 MV 搜索"}
+ {1,"MV清晰度"},{1,"提前缓冲"},{6,"公告"},{5,"隐私政策"},{4,"显示网速"},{0,"预下载后续歌曲"},{4,"界面渲染"},{4,"唱片播放器"},{1,"本地 MV 搜索"},{4,"省电模式"},{4,"自动息屏"},{4,"SoC 时钟"}
 };
 
 /* 把 [top,bottom) 这段保持在可视区里（不是钉在顶部，避免把页头滚没） */
@@ -2556,6 +2557,9 @@ static float follow_visible(float scroll, int top, int bottom, int view_top,
 static void settings_value(int i, char *val, int len)
 {
     val[0] = 0;
+    if(i==25){snprintf(val,len,"%s",power_runtime_eco()?"开（空闲30帧）":"关");return;}
+    if(i==26){int s=power_runtime_timeout();if(s<0)snprintf(val,len,"常亮");else if(!s)snprintf(val,len,"跟随系统");else snprintf(val,len,"%d秒%s",s,power_runtime_backlight_supported()?"无操作":"（仅画面）");return;}
+    if(i==27){int c=power_runtime_clock();if(c)snprintf(val,len,"%d MHz（MV 333）",c);else snprintf(val,len,"自动（当前%d MHz）",power_runtime_effective_clock());return;}
     if(i==24){snprintf(val,len,"%s",store_scan_local_mv()?"开（不推荐·较慢）":"关（只显示下载的 MV）");return;}
     if(i==23){snprintf(val,len,"%s",store_disc_player()?"开":"关");return;}
     /* Show an accepted pending selection immediately; after startup failure,

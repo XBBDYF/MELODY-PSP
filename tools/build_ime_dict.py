@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "tools" / "ime"
 OUT = ROOT / "src" / "ime_dict_data.h"
 FONT = ROOT / "src" / "font16.bin"
-MAX_CHARS_PER_SYL = 15
+MAX_WORDS = 8192
 
 # 常用字频率序（约 500 字，用来给同一音节的单字排序；不在表里的排在后面按 GB 码位）
 FREQ_ORDER = (
@@ -23,7 +23,7 @@ FREQ_ORDER = (
 )
 
 # 补充：主频表之后的常见字/姓名/歌名用字，保证同音节里排在 GB 码位之前
-EXTRA_BOOST = '陈晨辰沉忱诚城承呈程乘成称臣郴尘张章赵钱孙李周吴郑王冯褚卫蒋沈韩杨朱秦尤许何吕施林俊杰紫棋奕迅荣浩之谦晨宇不易苏泷嵩菲英学友德华五月天周杰伦邓紫棋陈奕迅薛之谦李荣浩毛不易华晨宇汪苏泷许嵩王菲那英稻香晴天七里香青花瓷夜曲屋顶花海泡沫演员丑八怪后来童话十年中国音乐歌手歌曲专辑搜索播放下载歌词评论喜欢推荐排行每日我的设置关于本地缓存主题皮肤音量暂停继续上一首下一首循环随机单曲'
+EXTRA_BOOST = '祝陈晨辰沉忱诚城承呈程乘成称臣郴尘张章赵钱孙李周吴郑王冯褚卫蒋沈韩杨朱秦尤许何吕施林俊杰紫棋奕迅荣浩之谦晨宇不易苏泷嵩菲英学友德华五月天周杰伦邓紫棋陈奕迅薛之谦李荣浩毛不易华晨宇汪苏泷许嵩王菲那英稻香晴天七里香青花瓷夜曲屋顶花海泡沫演员丑八怪后来童话十年中国音乐歌手歌曲专辑搜索播放下载歌词评论喜欢推荐排行每日我的设置关于本地缓存主题皮肤音量暂停继续上一首下一首循环随机单曲'
 FREQ_ORDER = FREQ_ORDER + EXTRA_BOOST
 
 
@@ -75,16 +75,18 @@ def parse_pinyin_data(path, font_cps):
         cp = int(m.group(1), 16)
         if cp not in font_cps:
             continue
-        first = m.group(2).split(",")[0].strip()
-        syl = strip_tone(first)
-        if not syl or not re.fullmatch(r"[a-z]+", syl):
-            continue
         ch = chr(cp)
-        if ch.isspace() or ch in '\u3000\u00a0':   # 空白/全角空格不要进候选
+        if ch.isspace() or not 0x3400 <= cp <= 0x9fff:
             continue
-        lst = groups.setdefault(syl, [])
-        if ch not in lst:
-            lst.append(ch)
+        # Include every attested reading: a polyphonic character must be reachable
+        # under each spelling, not only the source's first reading.
+        for reading in m.group(2).split(","):
+            syl = strip_tone(reading.strip())
+            if not re.fullmatch(r"[a-z]+", syl):
+                continue
+            lst = groups.setdefault(syl, [])
+            if ch not in lst:
+                lst.append(ch)
     rank = {}
     for i, ch in enumerate(FREQ_ORDER):
         rank.setdefault(ch, i)      # 重复字保留第一次出现（更靠前）
@@ -95,7 +97,7 @@ def parse_pinyin_data(path, font_cps):
 
     for syl in groups:
         groups[syl].sort(key=sort_key)
-        groups[syl] = groups[syl][:MAX_CHARS_PER_SYL]
+        # Keep the entire font-covered group; runtime/UI scroll through all of it.
     return groups
 
 
@@ -130,6 +132,38 @@ def emit_entries(rows, name, out):
     out.append(f"static const int {name}_count = (int)(sizeof({name}) / sizeof({name}[0]));\n\n")
 
 
+def load_words(font_cps, curated):
+    """Bounded MIT jieba vocabulary, highest-frequency words first.
+
+    Character readings are deterministic first readings from pinyin-data. Curated
+    whole-word readings override this fallback (important for polyphonic music terms).
+    """
+    readings = {}
+    pat = re.compile(r"^U\+([0-9A-Fa-f]+):\s*([^#]+)")
+    for line in (SRC / "pinyin-data.txt").read_text(encoding="utf-8").splitlines():
+        m = pat.match(line)
+        if m:
+            reading = strip_tone(m.group(2).split(",")[0].strip())
+            if re.fullmatch(r"[a-z]+", reading):
+                readings[chr(int(m.group(1),16))] = reading
+    known = {r[1]: r for r in curated}
+    words = []
+    for line in (SRC / "jieba/dict.txt").read_text(encoding="utf-8").splitlines():
+        fields = line.split()
+        if len(fields)<2: continue
+        word, count = fields[0], int(fields[1])
+        if not 2<=len(word)<=6 or count<5 or len(word.encode("utf-8"))>=24: continue
+        if word in known or any(ord(c) not in font_cps or c not in readings for c in word): continue
+        key = "".join(readings[c] for c in word)
+        if len(key)>=48: continue
+        words.append((count,word,key))
+    words.sort(key=lambda r:(-r[0],r[1]))
+    for count,word,key in words[:MAX_WORDS]:
+        # Use real corpus frequency; curated entries are boosted separately.
+        known[word]=(key,word,min(count,1000000))
+    return sorted(known.values(),key=lambda r:(r[0],-r[2],r[1]))
+
+
 def main():
     js = (SRC / "pinyin-data.txt")
     if not js.exists():
@@ -138,6 +172,7 @@ def main():
     groups = parse_pinyin_data(js, font_cps)
 
     py = parse(SRC / "pinyin.txt", True)
+    py = load_words(font_cps, [(k,w,1000000+f) for k,w,f in py])
     ja = parse(SRC / "japanese.txt", False)
 
     kept_py = [r for r in py if all(ord(c) < 0x80 or ord(c) in font_cps for c in r[1])]
@@ -150,6 +185,12 @@ def main():
 
     emit_entries(kept_py, "k_ime_pinyin", body)
     emit_entries(kept_ja, "k_ime_kana", body)
+    # Text-sorted indexes support Chinese-prefix associations without duplicating strings.
+    indexes = sorted(range(len(kept_py)), key=lambda i: kept_py[i][1])
+    body.append("static const unsigned short k_ime_assoc_index[] = {\n")
+    for i in range(0,len(indexes),24):
+        body.append("    " + ",".join(map(str,indexes[i:i+24])) + ",\n")
+    body.append("};\n\n")
 
     # 单字表：按音节排序，供二分查找
     body.append("static const ImeCharGroup k_ime_chars[] = {\n")

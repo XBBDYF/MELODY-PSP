@@ -1,4 +1,5 @@
 #include "skin_options_ui.h"
+#include "power_runtime.h"
 #include "skin_options.h"
 #include "skin_runtime.h"
 #include "gfx.h"
@@ -6,7 +7,10 @@
 #include <pspctrl.h>
 #include <stdio.h>
 static int opened,selected;
-void skin_options_dialog_open(void){opened=1;selected=0;}
+void skin_options_dialog_open(void){
+ for(int i=0;i<skin_options_count();++i){const SkinOption*o=skin_options_at(i);int v=power_runtime_theme_value(o->id);if(v>=0&&v!=o->value)skin_options_set(i,v);}
+ opened=1;selected=0;
+}
 int skin_options_dialog_active(void){return opened;}
 int skin_options_dialog_input(unsigned pressed,unsigned held,float dt){
  (void)held;(void)dt;if(!opened)return 0;
@@ -14,7 +18,7 @@ int skin_options_dialog_input(unsigned pressed,unsigned held,float dt){
  if(pressed&PSP_CTRL_CROSS){opened=0;return 1;}
  if((pressed&PSP_CTRL_UP)&&selected>0)--selected;
  if((pressed&PSP_CTRL_DOWN)&&selected+1<count)++selected;
- if(count>0&&(pressed&(PSP_CTRL_LEFT|PSP_CTRL_RIGHT|PSP_CTRL_CIRCLE))){int r=skin_options_adjust(selected,(pressed&PSP_CTRL_LEFT)?-1:1);if(r<0)ui_toast("主题设置保存失败，保留原值");else{skin_runtime_refresh_palette();ui_theme_changed();}}
+ if(count>0&&(pressed&(PSP_CTRL_LEFT|PSP_CTRL_RIGHT|PSP_CTRL_CIRCLE))){int old=skin_options_at(selected)->value;int r=skin_options_adjust(selected,(pressed&PSP_CTRL_LEFT)?-1:1);if(r>=0){const SkinOption*o=skin_options_at(selected);if(power_runtime_theme_option(o->id,o->value)<0){skin_options_set(selected,old);r=-1;}}if(r<0)ui_toast("主题设置保存失败，保留原值");else{skin_runtime_refresh_palette();ui_theme_changed();}}
  return 1;
 }
 void skin_options_dialog_draw(void){

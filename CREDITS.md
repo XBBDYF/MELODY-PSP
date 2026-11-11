@@ -31,6 +31,15 @@ MELODY 能跑起来，靠的不只是这个仓库里的代码。这里按「帮�
 | **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)** | 接口字段与调用方式资料（本程序直接请求官方接口，未内置该服务） | 参考（MIT） |
 | **思源黑体 / WenQuanYi Micro Hei** | 点阵字库的来源字体 | **SIL OFL 1.1 / Apache-2.0** |
 
+## 输入法数据
+
+| 项目 | 用途 | 许可 |
+|---|---|---|
+| [jieba v0.42.1](https://github.com/fxsjy/jieba/tree/v0.42.1) | 离线常用词频数据子集；不加载jieba运行时 | MIT / Copyright (c) 2013 Sun Junyi |
+| [pinyin-data](https://github.com/mozillazg/pinyin-data) | 汉字多音读音表 | MIT / Copyright (c) 2016 mozillazg |
+
+完整许可随`tools/ime/`保留，运行包附MIT文本。
+
 ## 特别感谢
 
 - 所有公开 PSP 硬件资料、逆向笔记与论坛帖子的作者——`sceMp3` 的边界条件、

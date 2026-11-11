@@ -24,10 +24,10 @@ WiliMini 的解码代码（GPL-3.0）与 FFmpeg（LGPL-2.1-or-later）。
 
 ### pinyin-data（单字读音表）
 
-- 位置：	ools/ime/pinyin-data.txt
+- 位置：`tools/ime/pinyin-data.txt`
 - 许可证：**MIT**
 - 来源：https://github.com/mozillazg/pinyin-data（基于 Unicode Unihan 的读音整理）
-- 用途：	ools/build_ime_dict.py 生成搜索结果里的单字候选表（k_ime_chars[]），不进入绘制/解码路径
+- 用途：`tools/build_ime_dict.py` 生成搜索结果里的单字候选表（k_ime_chars[]），不进入绘制/解码路径
 
 ### 点阵字库
 
@@ -113,3 +113,10 @@ WiliMini 的解码代码（GPL-3.0）与 FFmpeg（LGPL-2.1-or-later）。
 - 使用者应自行确认所在地区关于网络服务与版权内容的法律要求。
 
 如你是权利人并认为本仓库某部分侵犯了你的权利，请通过仓库 Issue 联系，我们会移除相关内容。
+
+## 输入法词频数据（2026-11-11）
+
+jieba v0.42.1：MIT / Copyright (c) 2013 Sun Junyi。原始词典与完整许可见
+`tools/ime/jieba/dict.txt`、`tools/ime/jieba/LICENSE`，来源说明见同目录`SOURCE.md`。
+生成器仅采用最多8192个高频且字体覆盖的词，与人工表去重；没有引入jieba执行库。
+pinyin-data：MIT / Copyright (c) 2016 mozillazg，完整许可见`tools/ime/pinyin-data.LICENSE`。

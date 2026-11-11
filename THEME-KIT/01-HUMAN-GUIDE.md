@@ -232,4 +232,4 @@ python -B TOOLS/make_theme_font.py font.ttf --size 22 --chars "文本" -o skins/
 - 需要滚动/动画的页面交给原生（不写该页面即可回落）；
 - 参考 `EXAMPLES/eco/`。
 
-> 主题能影响的只有「绘制量」；时钟、背光、Wi-Fi、音频解码都不在主题 API 里。
+> 主题能影响的只有「绘制量」；基础绘图本身不控制硬件。2026-11-11开发构建新增电源动作和保留选项，见[08-POWER-CONTROLS.md](08-POWER-CONTROLS.md)；Wi-Fi、音频解码仍由程序管理。

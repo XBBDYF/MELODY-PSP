@@ -72,6 +72,15 @@
       "description": "音乐功能目录与文件夹导航，独立PSP播放页，多配色音乐动效",
       "script": true,
       "preview": true
+    },
+    {
+      "id": "eco",
+      "name": "ECO 轻量省电",
+      "author": "MELODY",
+      "version": "1.0",
+      "description": "无动画、无封面；省电/背光超时/SoC时钟可在主题设置调整，MV自动恢复性能档",
+      "script": true,
+      "preview": false
     }
   ]
 }

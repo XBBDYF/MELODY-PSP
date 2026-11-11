@@ -38,6 +38,7 @@
 #include "ui.h"
 #include "skin_runtime.h"
 #include "skin_options_ui.h"
+#include "power_runtime.h"
 #include "ime.h"
 #include "search_history.h"
 #include "search_chips.h"
@@ -1484,6 +1485,7 @@ static int mv_try_start(void)
         return 1;
     }
     g_mv_pending = 0;
+    power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
     if (mv_start(g_app.now.mv, path, g_app.now.name) == 0) {
         g_app.menu_open = 0;
         set_screen(SC_MV);
@@ -1547,6 +1549,7 @@ static void mv_pending_tick(void)
         g_mv_from = g_app.screen;
         audio_pause(1);
     }
+    power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
     if ((streaming ? mv_start_stream(path, g_app.now.name) :
                      mv_start(id, path, g_app.now.name)) == 0) {
         mlog("mv: pending start stream=%d at %lld/%lld", streaming, av, mv_stream_total());
@@ -1712,6 +1715,11 @@ static void input_mine(unsigned pressed,unsigned held,float dt);
 static void input_cache(unsigned pressed,unsigned held,float dt);
 static void skin_actions_tick(void){int notice=skin_runtime_take_notice();if(notice==1)ui_toast("皮肤该页面出错，暂用原界面；其他页面保留");else if(notice==2)ui_toast("皮肤内存不足，已回退；可重新应用皮肤");char action[48],arg[128];if(!skin_runtime_action(action,sizeof(action),arg,sizeof(arg)))return;
  if(!strcmp(action,"setting")||!strcmp(action,"setting_adjust")){int index=atoi(arg)-1;if(index>=0&&index<MELODY_SETTINGS_COUNT){g_app.settings_sel=index;input_settings(!strcmp(action,"setting_adjust")?PSP_CTRL_RIGHT:PSP_CTRL_CIRCLE,0,.016f);}return;}
+ if(!strcmp(action,"power_eco")||!strcmp(action,"power_timeout")||!strcmp(action,"power_clock")){
+  char *end;long v=strtol(arg,&end,10);
+  if(!arg[0]||*end||v< -1||v>333||power_runtime_set(action+6,(int)v)<0)ui_toast("省电参数无效或保存失败");
+  return;
+ }
  if(!strcmp(action,"cancel_skin_load")){g_app.cards_open=0;g_app.play_all_next=0;g_app.busy=0;return;}
  if(!strcmp(action,"xmb_back")){xmb_go_back();return;}
  if(!strcmp(action,"xmb_open")){
@@ -1808,6 +1816,14 @@ static void search_refresh_chips(void)
     if (g_app.chip_sel >= g_app.chips_n) g_app.chip_sel = 0;
 }
 
+static void search_refresh_local(void)
+{
+    const char *key=ime_active()?ime_preedit():g_app.query;
+    g_app.assoc_n=ime_assoc(key,g_app.assoc,APP_ASSOC_MAX);
+    g_app.chip_sel=0;g_app.chip_off=0;
+    g_app.ime_sel=0;g_app.ime_off=0;
+}
+
 static void query_append(const char *s)
 {
     int len = (int)strlen(g_app.query);
@@ -1816,6 +1832,7 @@ static void query_append(const char *s)
     if (len + add >= (int)sizeof(g_app.query) - 1) return;
     memcpy(g_app.query + len, s, (size_t)add + 1);
     g_app.query_len = len + add;
+    search_refresh_local();
 }
 
 static void query_backspace(void)
@@ -1828,13 +1845,14 @@ static void query_backspace(void)
     while (len > 0 && ((unsigned char)g_app.query[len] & 0xC0) == 0x80) len--;
     g_app.query[len] = 0;
     g_app.query_len = len;
+    search_refresh_local();
 }
 
 /* 字母进输入法：ASCII 模式直接写搜索框，拼音/假名先进 preedit */
 /* 上屏后立即刷新联想：本地词库补全 + 在线联想（提示词也算） */
 static void search_after_commit(void)
 {
-    g_app.assoc_n = ime_assoc(g_app.query, g_app.assoc, APP_CHIP_MAX);
+    g_app.assoc_n = ime_assoc(g_app.query, g_app.assoc, APP_ASSOC_MAX);
     g_app.chip_sel = 0;
     if (g_app.query[0]) {
         snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
@@ -1848,6 +1866,7 @@ static void search_type_char(char ch)
 {
     static char last_pre[24];
     int r = ime_feed(ch);
+    search_refresh_local();
 
     if (r == 2) {
         char s[2] = { ch, 0 };
@@ -1927,6 +1946,7 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
 
     if (pressed & PSP_CTRL_SQUARE) {
         ime_toggle_mode();
+        search_refresh_local();
         ui_toast(ime_mode() == IME_KANA ? "输入法：假名（罗马字）" : ime_mode() == IME_ASCII ? "输入法：英文直输" : "输入法：拼音");
         g_app.ime_sel = 0;
         return;
@@ -1935,6 +1955,7 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
         g_app.query[0] = 0;
         g_app.query_len = 0;
         ime_reset();
+        search_refresh_local();
         g_app.ime_sel = 0;
         return;
     }
@@ -1987,6 +2008,9 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
                   : (sug_n > 0 ? sug_n : (ime ? 0 : g_app.chips_n));
         int hist_n = search_hist_count();
         int row = g_app.kb_row;
+        if((row==-2&&!bot_n)||(row==-1&&!top_n)||(row==-3&&!hist_n)){
+            row=bot_n?-2:(top_n?-1:(hist_n?-3:0));g_app.kb_row=row;
+        }
 
         if (g_app.chip_sel >= top_n) g_app.chip_sel = top_n ? top_n - 1 : 0;
         if (g_app.ime_sel >= bot_n) g_app.ime_sel = bot_n ? bot_n - 1 : 0;
@@ -2109,6 +2133,7 @@ static void input_search(unsigned int pressed, unsigned int held, float dt)
                 search_type_char(kb1[col]);
             } else if (ime_active()) {
                 ime_backspace();
+            search_refresh_local();
             } else {
                 query_backspace();
             }
@@ -2569,6 +2594,7 @@ static void input_download(unsigned int pressed, unsigned int held, float dt)
                     g_mv_from = SC_DOWNLOAD;
                     audio_pause(1);
                     if(mvx_active()){ui_toast("MV导出中，请稍后播放");return;}
+                    power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
                     if (mv_start(items[g_app.dl_sel].mvid, items[g_app.dl_sel].path,
                                  items[g_app.dl_sel].name) == 0) {
                         g_app.dl_tab = 0;
@@ -2809,6 +2835,11 @@ static void input_settings(unsigned int pressed, unsigned int held, float dt)
         return;
     }
     if(setting==3&&(pressed&(PSP_CTRL_CIRCLE|PSP_CTRL_LEFT|PSP_CTRL_RIGHT))){open_skin_center();return;}
+    if(setting>=25&&setting<=27&&(pressed&(PSP_CTRL_LEFT|PSP_CTRL_RIGHT|PSP_CTRL_CIRCLE))){
+        if(power_runtime_cycle(setting,(pressed&PSP_CTRL_LEFT)?-1:1)<0)ui_toast("省电设置保存失败");
+        else ui_toast("省电设置已保存；MV 自动恢复性能档");
+        return;
+    }
     if(setting==21&&(pressed&(PSP_CTRL_LEFT|PSP_CTRL_RIGHT|PSP_CTRL_CIRCLE))){int n=store_prefetch_count();n=(n+((pressed&PSP_CTRL_LEFT)?5:1))%6;store_set_prefetch_count(n);if(!n)api_cancel_pending_prefetch();ui_toast(n?"后续预下载已调整，随机模式与下一首同步":"后续预下载已关闭");return;}
     if (btn_repeat(pressed, held, dt, PSP_CTRL_UP)) {
         if (g_app.settings_sel > 0) g_app.settings_sel--;
@@ -3378,6 +3409,7 @@ static void auto_test(float dt)
             stage=1;g_test_t=0;
             if(!url[0]||mv_stream_start(url,APP_DIR "cache/mv_990000003_240.mp4")<0){mlog("TEST62 source-start failed");stage=4;}
         }else if(stage==1&&mv_stream_total()>0&&mv_stream_available()>=mv_stream_prefetch()){
+            power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
             int result=mv_start_stream(APP_DIR "cache/mv_990000003_240.mp4","Software HTTP Test");
             mlog("TEST62 start result=%d available=%lld total=%lld",result,mv_stream_available(),mv_stream_total());
             if(!result){set_screen(SC_MV);stage=2;g_test_t=0;}else stage=4;
@@ -4000,6 +4032,7 @@ static int exit_callback(int arg1, int arg2, void *common)
      * 这里给主线程 500ms 做正常收尾；超时就由回调线程直接 ExitGame，
      * 保证系统退出流程一定能完成。 */
     sceKernelDelayThread(500 * 1000);
+    power_runtime_shutdown();
     log_flush();
     sceKernelExitGame();
     return 0;
@@ -4060,8 +4093,10 @@ int app_main(void)
 
     gfx_init();
     log_open();
+    power_runtime_init();
     mlog("MELODY PSP %s start %s %s", APP_VER, __DATE__, __TIME__);
     if (playback_context_init() < 0) {
+        power_runtime_shutdown();
         log_close();
         sceKernelExitGame();
         return -1;
@@ -4088,7 +4123,7 @@ int app_main(void)
     snprintf(g_app.net_msg, sizeof(g_app.net_msg), "正在初始化");
 
     ui_init();
-    if(!privacy_gate()){mlog("privacy declined: exit before audio/network/API initialization");log_close();sceKernelExitGame();return 0;}
+    if(!privacy_gate()){power_runtime_shutdown();mlog("privacy declined: exit before audio/network/API initialization");log_close();sceKernelExitGame();return 0;}
     /* Reserve the idle stream worker before optional high-address GUI caches.
      * A late64KiB stack otherwise pins the gap after those caches are freed. */
     if(mv_stream_prepare_worker()<0)mlog("mv stream: early worker reservation failed");
@@ -4167,6 +4202,13 @@ int app_main(void)
             g_pending_press = 0;
         }
 
+        /* Wake keys never reach playback/menu actions, even while held. */
+        if(power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),
+             ((sampled_held|pressed)&(PSP_CTRL_SELECT|PSP_CTRL_START|PSP_CTRL_UP|PSP_CTRL_DOWN|
+               PSP_CTRL_LEFT|PSP_CTRL_RIGHT|PSP_CTRL_LTRIGGER|PSP_CTRL_RTRIGGER|
+               PSP_CTRL_TRIANGLE|PSP_CTRL_CIRCLE|PSP_CTRL_CROSS|PSP_CTRL_SQUARE))!=0,g_app.screen==SC_MV||g_mv_connecting||mv_active(),
+             api_busy()||audio_state()==AUDIO_BUFFER,
+             g_app.screen==SC_BOOT||g_app.screen==SC_WIFI)) pressed=held=0;
         pump_events();
 
         /* 启动静默检查发现新版本：回到主页就弹窗（只弹一次，按过"稍后"不再弹） */
@@ -4391,6 +4433,7 @@ int app_main(void)
                         SceIoStat st;
 
                         if (sceIoGetstat(path, &st) >= 0) {
+                            power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
                             if (mv_start(mv, path, g_list.songs[i].name) == 0) {
                                 mlog("TEST mv play mvid=%d path=%s", mv, path);
                                 set_screen(SC_MV);
@@ -4716,6 +4759,10 @@ int app_main(void)
             if (g_exit_confirm) g_app.confirm_clear = 5;
             g_app.time=now_sec(); /* Catalog I/O must not age the first closing frame. */
             perf_draw0 = (unsigned)sceKernelGetSystemTimeLow();
+            if(!power_runtime_render_due((unsigned)(sceKernelGetSystemTimeWide()/1000),0)) {
+                if(power_runtime_blanked())sceKernelDelayThread(20000);
+                else sceDisplayWaitVblankStart();
+            } else {
             ui_draw();
             if(policy_open)ui_document("隐私政策",community_privacy_text(),policy_scroll,"○ / × 返回设置");
             else if(notice_open){const CommunityAnnouncement*n=community_announcement_get();if(n)ui_document(n->title,n->text,notice_scroll,notice_ignore?"[已选] 下次不弹  □切换  ○关闭":"[未选] 下次不弹  □切换  ○关闭");}
@@ -4735,6 +4782,7 @@ int app_main(void)
                     perf_draw_sum = perf_flip_sum = perf_frames = 0;
                 }
             }
+            } /* power render gate: keep visible framebuffer when skipping */
         }
 
         /* 绘制期间（可能有几十毫秒）按下的键：再采一次攒给下一帧，
@@ -4780,6 +4828,7 @@ int app_main(void)
     /* 退出前先把刚下载的更新换上：下次启动直接是新版本，不用再进两次。 */
     update_apply_startup();
 
+    power_runtime_shutdown();
     mlog("exit: stopping audio");
     audio_stop();
     audio_shutdown();

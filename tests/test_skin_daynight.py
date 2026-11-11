@@ -33,13 +33,32 @@ class RestoredSkinTests(unittest.TestCase):
 
     def test_catalog_append_preserves_existing_entries(self):
         current = json.loads((SKINS / 'index.json').read_text(encoding='utf-8'))
+        before = json.loads((ROOT / 'backups/DAYNIGHT_20261107_0409/index.json').read_text(encoding='utf-8'))
+        for prior in before['skins']:
+            if prior['id']!='metro':self.assertIn(prior,current['skins'])
+        self.assertEqual({x['id']for x in current['skins'][:len(before['skins'])]},{x['id']for x in before['skins']})
         ids = [item['id'].lower() for item in current['skins']]
         self.assertEqual(len(ids), len(set(ids)))
         self.assertIn('daylight',ids);self.assertIn('night',ids);self.assertNotIn('metro_day',ids)
-        self.assertIn('xmb',ids);self.assertLessEqual(len(current['skins']), 32)
+        self.assertIn('xmb',ids);self.assertEqual(len(current['skins']), len(before['skins']) + 4)
         for entry in (x for x in current['skins']if x['id']in('daylight','night')):
             self.assertIs(entry['script'], False)
             self.assertIs(entry['preview'], True)
+
+    def test_generator_supports_both_without_changing_script_templates(self):
+        source = (ROOT / 'tools/make_skin_examples.py').read_text(encoding='utf-8')
+        backup = (ROOT / 'backups/DAYNIGHT_20261107_0409/make_skin_examples.py').read_text(encoding='utf-8')
+        def templates(text):
+            return {node.targets[0].id: ast.literal_eval(node.value)
+                    for node in ast.parse(text).body
+                    if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id == 'paper'}
+        self.assertEqual(templates(source), templates(backup))
+        self.assertIn("metro_template=R/'tools/skin_templates/metro.lua'",source)
+        self.assertEqual((ROOT/'tools/skin_templates/metro.lua').read_bytes(),(SKINS/'metro/skin.lua').read_bytes())
+        self.assertIn("('daylight','白天模式','#C20C0C',False)", source)
+        self.assertIn("('night','黑夜模式','#EC4141',False)", source)
+
 
 if __name__ == '__main__':
     unittest.main()

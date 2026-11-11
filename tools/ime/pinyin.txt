@@ -110,3 +110,16 @@
 理想三旬|lixiangsanxun|5
 莉莉安|lilian|5
 玫瑰|meigui|6
+
+# Whole-word reading overrides for common greetings / polyphonic music terms
+祝福|zhufu|8
+祝愿|zhuyuan|8
+祝贺|zhuhe|8
+祝你生日快乐|zhunishengrikuaile|8
+生日快乐|shengrikuaile|8
+快乐|kuaile|8
+重庆|chongqing|8
+重新|chongxin|8
+重要|zhongyao|8
+银行|yinhang|8
+旅行|lvxing|8

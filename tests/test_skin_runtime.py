@@ -17,6 +17,7 @@ code=r'''
 #include <io.h>
 #include "app.h"
 #include "skin_runtime.h"
+#include "ime.h"
 #include "skin_options.h"
 #include "dl.h"
 #include "cache.h"
@@ -90,6 +91,13 @@ void gfx_set_clip(int a,int b,int c,int d){(void)a;(void)b;(void)c;(void)d;}
 void gfx_reset_clip(void){}
 static int module(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;draws++;return 1;}
 int main(int argc,char**argv){char err[192],action[48],arg[128];if(argc==3&&!strcmp(argv[1],"--validate")){int r=skin_runtime_validate(argv[2],err,sizeof(err));printf("%s %s\n",r==0?"VALID":"INVALID",r==0?argv[2]:err);return r<0;}if(argc==3&&!strcmp(argv[1],"--disc-animation")){Song song={0};strcpy(song.name,"Disc track");song.id=432;assert(skin_runtime_apply(argv[2],err,sizeof(err))==0);skin_runtime_set_playback(&song,1,1000,90000);g_app.paused=0;assert(skin_runtime_draw(SC_HOME,1,.05f));float a=drawn_disc_angle;assert(skin_runtime_draw(SC_HOME,1.05f,.05f));assert(drawn_disc_angle>a);g_app.paused=1;a=drawn_disc_angle;assert(skin_runtime_draw(SC_HOME,1.1f,.05f));assert(drawn_disc_angle==a&&drawn_disc_count==3);puts("PASS generated disc Lua rotates during play and preserves angle during pause");skin_runtime_reset();return 0;}
+if(argc==3&&!strcmp(argv[1],"--ime-model")){
+ assert(skin_runtime_apply(argv[2],err,sizeof(err))==0);
+ ime_set_mode(IME_PINYIN);ime_feed('z');ime_feed('h');ime_feed('u');
+ for(int f=0;f<60;++f)assert(skin_runtime_draw(SC_SEARCH,f*.016f,.016f));
+ ime_reset();ime_feed('y');ime_feed('i');
+ for(int f=0;f<60;++f)assert(skin_runtime_draw(SC_SEARCH,f*.016f,.016f));
+ skin_runtime_reset();puts("PASS all zhu/yi candidates survive Lua model and repeated bounded-heap draws");return 0;}
 if(argc==3&&!strcmp(argv[1],"--source-bindings")){
  enable_fixture=1;daily_fixture.id=111;strcpy(daily_fixture.art,"daily-cover");home_fixture.count=2;strcpy(home_fixture.items[0].cover,"recommend-one");strcpy(home_fixture.items[1].cover,"recommend-two");
  assert(skin_runtime_apply(argv[2],err,sizeof(err))==0);assert(skin_runtime_draw(SC_HOME,1,.016f));assert(bound_count==2&&!strcmp(bound_urls[0],"daily-cover")&&!strcmp(bound_urls[1],"recommend-two")&&avatar_requests==1);puts("PASS actual tile_cover chooses daily snapshot and requested recommendation index; avatar uses account cache");skin_runtime_reset();return 0;}
@@ -131,6 +139,12 @@ if(argc==3&&!strcmp(argv[1],"--slow-device")){
 
 # 主题字体在宿主机测试里只需要桩：apply/release 走文件 I/O，不在本用例范围
 FONT_STUBS = r"""
+int power_runtime_backlight_supported(void){return 1;}
+int power_runtime_eco(void){return 0;}
+int power_runtime_timeout(void){return 0;}
+int power_runtime_clock(void){return 0;}
+int power_runtime_effective_clock(void){return 333;}
+int power_runtime_blanked(void){return 0;}
 int skin_font_apply(const char *root){(void)root;return 0;}
 void skin_font_release(void){}
 int skin_font_bytes(void){return 0;}
@@ -166,3 +180,9 @@ subprocess.run([exe,"--home-categories",R/"skin_release/melody/skins/metro"],cwd
 subprocess.run([exe,"--wait-and-lyrics",R/"skin_release/melody/skins/metro"],cwd=R,check=True,timeout=15)
 
 if (R/".tmp/skin-editor-exports/editor_disc/skin.lua").exists():subprocess.run([exe,"--disc-animation",R/".tmp/skin-editor-exports/editor_disc"],cwd=R,check=True,timeout=10)
+
+with tempfile.TemporaryDirectory(prefix='melody-ime-model-') as td:
+ probe=Path(td)/'imeprobe';probe.mkdir()
+ (probe/'skin.json').write_text(json.dumps({'schema':1,'id':'imeprobe','name':'imeprobe','script':'skin.lua'}),encoding='utf-8')
+ (probe/'skin.lua').write_text('return {draw=function(page,t,dt,m) if m.ime_active==1 then local c=m.ime_candidates; if m.ime_pre=="zhu" then local ok=false; for _,v in ipairs(c)do if v=="祝"then ok=true end end assert(ok and #c>15) elseif m.ime_pre=="yi"then assert(#c>400)end end return true end}',encoding='utf-8')
+ subprocess.run([exe,'--ime-model',probe],cwd=R,check=True,timeout=15)

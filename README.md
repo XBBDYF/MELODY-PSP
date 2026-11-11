@@ -363,6 +363,7 @@ make WILIMINI=/path/to/WiliMini
 | [皮肤与主题](docs/THEMES.md) | `skin.json` 字段、页面名、`ui.*` / `app.*` 全部宿主 API |
 | [搜索页设计](docs/SEARCH-UI.md) | 输入法候选、搜索历史、推荐搜索的布局与按键 |
 | [输入法与主题字体](docs/IME-AND-FONTS.md) | 词表格式、罗马字规则、PSPF 字库与体积预算 |
+| [省电与背光控制](docs/POWER-SAVING-THEME.md) | ECO主题、熄屏时间、SoC时钟、主题接口与真机验证边界 |
 | [主题制作包 THEME-KIT](THEME-KIT/README.md) | 给人类和 AI 的主题制作教程、API 全表、模板、校验工具 |
 | [测试说明](tests/README.md) | 测试分类、写法约定、需要额外产物的集成用例 |
 | [更新记录](CHANGELOG.md) | 4.1.1 → 4.1 → 4.0.1 → 4.0 → 3.5.0 → 3.4.x |
@@ -520,6 +521,8 @@ MELODY 以 **GNU General Public License v3.0** 发布，见 [LICENSE](LICENSE)�
 | [WiliMini](https://github.com/wilimini/WiliMini) | MV 软件解码参考实现（`pspvideo`）、FFmpeg 在 PSP 上的裁剪 | **GPL-3.0** |
 | [FFmpeg](https://ffmpeg.org/) | MV 容器解析与音视频解码 | **LGPL-2.1-or-later** |
 | [PSPSDK / pspdev](https://github.com/pspdev/pspdev) | 工具链、`sce*` 接口、启动器打包 | **BSD-3-Clause** |
+| [jieba](https://github.com/fxsjy/jieba) | 离线常用词频数据（仅生成期取子集） | **MIT** |
+| [pinyin-data](https://github.com/mozillazg/pinyin-data) | 汉字拼音及多音字数据 | **MIT** |
 | [Lua](https://www.lua.org/) | 皮肤与主题脚本虚拟机（5.4.7） | **MIT** |
 | [libjpeg-turbo](https://github.com/libjpeg-turbo/libjpeg-turbo) | 封面 JPEG 解码（经 `coverjpeg_psp` 封装，仅解码） | **BSD-3-Clause / IJG / zlib** |
 | [zlib](https://zlib.net/) | gzip 解压、更新包压缩 | **zlib License** |

@@ -2,13 +2,13 @@
 
 > 面向接手维护本项目的AI。先读本页，再按任务定向读代码。不要把整个工作目录、所有日志或历史发布包装进上下文。
 >
-> 核对日期：2026-11-08。当前源码版本 **4.1.1**，见 [src/app.h](src/app.h)。架构说明见 [PROJECT-RUNTIME.md](PROJECT-RUNTIME.md)。后续版本若变化，以代码和本轮实际构建清单为准。
+> 核对日期：2026-11-11。当前源码版本 **4.1.1**，见 [src/app.h](src/app.h)。架构说明见 [PROJECT-RUNTIME.md](PROJECT-RUNTIME.md)。后续版本若变化，以代码和本轮实际构建清单为准。
 
 ## 先看改动台账：WORKLOG.md
 
 **[WORKLOG.md](WORKLOG.md) 是本项目的改动流水。** 每次修改代码、发布包或关键文档，都在那页顶部加一条记录（改了什么、证据、验证到哪一层、下一步）。接手时先读最新一条，再回到本页按表定位文件；不要用重读整棵 `src/` 的方式「刷新上下文」。
 
-- 最新记录（2026-11-08 会话19）涉及：主题制作包 THEME-KIT（人类教程 + AI 规则 + API 全表 + 模板 + 工具 + 打包 zip）。技术细节见 [docs/FIELD-FIXES-20261108.md](docs/FIELD-FIXES-20261108.md)。
+- 最新记录：2026-11-11，省电/背光超时/时钟策略、ECO主题及中文输入法完整候选。见 [docs/POWER-SAVING-THEME.md](docs/POWER-SAVING-THEME.md) 与 [docs/IME-AND-FONTS.md](docs/IME-AND-FONTS.md)。
 - 那轮留下的未闭环项：`0x80020320`（SCE_KERNEL_ERROR_MFILE，文件句柄耗尽）来源未定位；4.1.1 未在物理 PSP 上复测（打包时记忆棒不在读卡器）。
 
 ## 开源仓库（2026-11-08 起）
@@ -107,7 +107,7 @@ flowchart LR
 | 搜索历史与推荐 | `src/search_history.c`、`src/search_chips.c` | 历史持久化格式、推荐优先级时读 [docs/SEARCH-UI.md](docs/SEARCH-UI.md) |
 | 主题自带字体 | `src/skin_font.c`、`gfx.c:pick_glyph`、`tools/make_theme_font.py` | 字体格式、预算、回退链；校验用 `tools/validate_skin_fonts.py` |
 | 教别人做主题 / 给 AI 的主题说明 | `THEME-KIT/README.md`、`THEME-KIT/02-AI-GUIDE.md` | 分发用压缩包 `MELODY-THEME-KIT.zip`；内部细节仍看 `docs/THEMES.md` 与 `src/skin_runtime.c` |
-| 省电主题可行性 / 功耗测量 | `docs/POWER-SAVING-THEME.md`、`THEME-KIT/EXAMPLES/eco` | 用 `perf:` 日志（`draw_us`/`flip_wait_us`）做对照实验 |
+| 省电/背光超时/时钟/唤醒 | `src/power_policy.h`、`src/power_runtime.c`、`docs/POWER-SAVING-THEME.md` | `test_power_policy.py`、`test_power_runtime.py`；配置 `power.cfg`，设置ID25..27，主题保留选项 `system_*` |
 | 运行流程 | [PROJECT-RUNTIME.md](PROJECT-RUNTIME.md) | 跨线程、跨模块问题才读完整链路 |
 | 当前发布二进制 | `releases/MELODY-4.1.1/manifest.json` | 安装、发包、对比设备版本时 |
 | 开源仓库与分发政策 | `E:\MELODY-PSP-OPENSOURCE\MELODY-PSP\docs\WORKFLOW.md`、`E:\MELODY-PSP-OPENSOURCE\MELODY-PSP\docs\GITHUB.md` | 提交代码、同步开源副本、回答「从哪下载」时 |

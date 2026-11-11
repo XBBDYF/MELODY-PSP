@@ -50,13 +50,13 @@ int main(void) {
     store_set_renderer(-1); assert(store_renderer() == 0);
     store_set_renderer(2); assert(store_renderer() == 0);
     int seen[MELODY_SETTINGS_COUNT] = {0};
-    assert(MELODY_SETTINGS_COUNT == 25);
+    assert(MELODY_SETTINGS_COUNT == 28);
     for (int row = 0; row < MELODY_SETTINGS_COUNT; ++row) {
-        int id = melody_setting_id(row); assert(id >= 0 && id < 25);
+        int id = melody_setting_id(row); assert(id >= 0 && id < MELODY_SETTINGS_COUNT);
         assert(!seen[id]++);
         if (id == 3) assert(melody_setting_id(row + 1) == 22);
     }
-    assert(melody_setting_id(-1) == -1 && melody_setting_id(25) == -1);
+    assert(melody_setting_id(-1) == -1 && melody_setting_id(MELODY_SETTINGS_COUNT) == -1);
     puts("PASS renderer legacy default, independent E record, roundtrip, binary values, stable IDs");
     return 0;
 }

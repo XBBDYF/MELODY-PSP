@@ -219,11 +219,11 @@ static void range(const ImeEntry *tab, int n, const char *key, int *lo, int *hi)
 static void collect(const ImeEntry *tab, int n, const char *key, int exact_only)
 {
     int lo, hi, i, k, kl = (int)strlen(key);
-    const ImeEntry *picked[CAND_MAX];
+    const ImeEntry *picked[32];
     int picked_n = 0;
 
     range(tab, n, key, &lo, &hi);
-    if (hi - lo > 64) hi = lo + 64;
+    /* Scan the complete prefix interval; do not discard frequent later entries. */
     for (i = lo; i < hi; ++i) {
         int pos;
 
@@ -233,16 +233,16 @@ static void collect(const ImeEntry *tab, int n, const char *key, int exact_only)
             continue;
         }
 
-        pos = picked_n < CAND_MAX ? picked_n : CAND_MAX;
+        pos = picked_n < 32 ? picked_n : 32;
         while (pos > 0 && (picked[pos - 1]->freq < tab[i].freq ||
                            (picked[pos - 1]->freq == tab[i].freq &&
                             strcmp(picked[pos - 1]->key, tab[i].key) > 0))) {
-            if (pos < CAND_MAX) picked[pos] = picked[pos - 1];
+            if (pos < 32) picked[pos] = picked[pos - 1];
             pos--;
         }
-        if (pos < CAND_MAX) {
+        if (pos < 32) {
             picked[pos] = &tab[i];
-            if (picked_n < CAND_MAX) picked_n++;
+            if (picked_n < 32) picked_n++;
         }
     }
     for (k = 0; k < picked_n; ++k) cand_add(picked[k]->word);
@@ -340,7 +340,7 @@ static void rebuild_candidates(void)
         if (!g_pre[0]) return;
         /* 顺序：整词完全匹配 → 同音节单字（多给几个，可横向滚动）→ 词首字 → 前缀词 */
         collect(k_ime_pinyin, k_ime_pinyin_count, g_pre, 1);
-        if (g_cand_n < 4) char_candidates(g_pre, 1, 16);
+        char_candidates(g_pre, 1, CAND_MAX-g_cand_n);
         if (g_cand_n < 20) word_initial_candidates(g_pre, 6);
         collect(k_ime_pinyin, k_ime_pinyin_count, g_pre, 0);
         return;
@@ -508,21 +508,33 @@ int ime_select(int i, char *out, int cap)
 
 int ime_assoc(const char *text, char out[][IME_WORD_MAX], int max)
 {
-    int n = 0;
-    int tl;
-
-    if (!text || !text[0] || !out || max <= 0) return 0;
-    tl = (int)strlen(text);
-
-    for (int i = 0; i < k_ime_pinyin_count && n < max; ++i) {
-        if (!strncmp(k_ime_pinyin[i].word, text, (size_t)tl) &&
-            strcmp(k_ime_pinyin[i].word, text))
-            snprintf(out[n++], IME_WORD_MAX, "%s", k_ime_pinyin[i].word);
+    const ImeEntry *best[32];
+    int count=0,lo=0,hi=k_ime_pinyin_count,tl,latin=1;
+    if(!text||!text[0]||!out||max<=0)return 0;
+    if(max>32)max=32;
+    tl=(int)strlen(text);
+    for(int i=0;i<tl;++i)if((unsigned char)text[i]>=128)latin=0;
+    if(latin)range(k_ime_pinyin,k_ime_pinyin_count,text,&lo,&hi);
+    else {
+        int a=0,b=k_ime_pinyin_count;
+        while(a<b){int m=(a+b)/2;if(strncmp(k_ime_pinyin[k_ime_assoc_index[m]].word,text,(size_t)tl)<0)a=m+1;else b=m;}
+        lo=a;b=k_ime_pinyin_count;
+        while(a<b){int m=(a+b)/2;if(strncmp(k_ime_pinyin[k_ime_assoc_index[m]].word,text,(size_t)tl)<=0)a=m+1;else b=m;}
+        hi=a;
     }
-    for (int i = 0; i < k_ime_kana_count && n < max; ++i) {
-        if (!strncmp(k_ime_kana[i].word, text, (size_t)tl) &&
-            strcmp(k_ime_kana[i].word, text))
-            snprintf(out[n++], IME_WORD_MAX, "%s", k_ime_kana[i].word);
+    for(int i=lo;i<hi;++i){
+        const ImeEntry *e=&k_ime_pinyin[latin?i:k_ime_assoc_index[i]];
+        int pos=count<max?count:max;
+        if(!strcmp(e->word,text))continue;
+        while(pos>0&&best[pos-1]->freq<e->freq){if(pos<max)best[pos]=best[pos-1];--pos;}
+        if(pos<max){best[pos]=e;if(count<max)++count;}
     }
-    return n;
+    for(int i=0;i<count;++i)snprintf(out[i],IME_WORD_MAX,"%s",best[i]->word);
+    for(int i=0;i<k_ime_kana_count&&count<max;++i){
+        const char*w=k_ime_kana[i].word;
+        if(strncmp(w,text,(size_t)tl)||!strcmp(w,text))continue;
+        int dup=0;for(int j=0;j<count;++j)if(!strcmp(out[j],w))dup=1;
+        if(!dup)snprintf(out[count++],IME_WORD_MAX,"%s",w);
+    }
+    return count;
 }

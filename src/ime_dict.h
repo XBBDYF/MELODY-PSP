@@ -13,7 +13,7 @@
 typedef struct {
     const char *key;      /* 查询键（UTF-8） */
     const char *word;     /* 上屏文本（UTF-8） */
-    unsigned char freq;   /* 1..9，越大越靠前 */
+    unsigned int freq;    /* Corpus frequency; curated readings receive a fixed boost. */
 } ImeEntry;
 
 /* 单字表：一个音节对应的常用字（按 GB2312 常用序） */

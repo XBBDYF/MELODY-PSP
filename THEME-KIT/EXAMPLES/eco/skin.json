@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "id": "eco",
-  "name": "ECO 省电原型",
+  "name": "ECO 轻量省电",
   "author": "MELODY",
-  "version": "0.1",
-  "description": "验证用：整屏 1 块底色 + 4 行文字，无封面/渐变/动画/音效",
+  "version": "1.0",
+  "description": "无动画、无封面；省电/背光超时/SoC时钟可在主题设置调整，MV自动恢复性能档",
   "dark": true,
   "colors": {
     "background": "#000000",
@@ -23,5 +23,39 @@
     "warning": "#CC9955",
     "shadow": "#000000"
   },
-  "script": "skin.lua"
+  "script": "skin.lua",
+  "preferences": [
+    {
+      "id": "system_eco",
+      "label": "程序省电模式",
+      "type": "toggle",
+      "default": 0
+    },
+    {
+      "id": "system_timeout",
+      "label": "自动息屏时间",
+      "type": "choice",
+      "options": [
+        "跟随系统",
+        "30秒",
+        "60秒",
+        "120秒",
+        "300秒",
+        "常亮"
+      ],
+      "default": 0
+    },
+    {
+      "id": "system_clock",
+      "label": "SoC时钟",
+      "type": "choice",
+      "options": [
+        "自动",
+        "222MHz",
+        "266MHz",
+        "333MHz"
+      ],
+      "default": 0
+    }
+  ]
 }

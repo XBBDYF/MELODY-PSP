@@ -3068,7 +3068,7 @@ typedef struct {
     unsigned generation;
 } Thumb;
 
-static Thumb g_thumbs[THUMB_MAX];
+static Thumb *g_thumbs; /* Owned by the reclaimable high-partition image cache. */
 static int g_thumb_stamp;
 typedef struct { char url[560]; int slot; unsigned generation; } ImageRequest;
 static unsigned g_image_generation;
@@ -3162,6 +3162,7 @@ static void image_request_url(const char *source, int dim, char *url, size_t siz
 static void home_thumbs_restore(void)
 {
     int restored = 0, checked = 0;
+    if (!g_thumbs) return;
     for (int i = 0; i < g_home_cards.count && i < THUMB_Q; ++i) {
         const char *source = g_home_cards.items[i].cover;
         char url[620];
@@ -3191,7 +3192,7 @@ int api_thumb_slot(const char *url)
 {
     int slot = -1, result = -1;
     unsigned now = sceKernelGetSystemTimeLow();
-    if (!url || !url[0] || strlen(url) >= sizeof(g_thumbs[0].url) || !lock_take(g_lock)) return -1;
+    if (!g_thumbs || !url || !url[0] || strlen(url) >= sizeof(g_thumbs[0].url) || !lock_take(g_lock)) return -1;
     for (int i = 0; i < THUMB_MAX; ++i) {
         if (!strcmp(g_thumbs[i].url, url)) {
             if (g_thumbs[i].state == 3 && (unsigned)(now - g_thumbs[i].fail_t) >= 30000000u) {
@@ -3226,7 +3227,7 @@ int api_thumb_slot(const char *url)
 const unsigned short *api_thumb_px(int slot)
 {
     const unsigned short *px = NULL;
-    if (slot < 0 || slot >= THUMB_MAX || !lock_take(g_lock)) return NULL;
+    if (!g_thumbs || slot < 0 || slot >= THUMB_MAX || !lock_take(g_lock)) return NULL;
     if (g_thumbs[slot].state == 2) px = g_thumbs[slot].px;
     lock_give(g_lock);
     return px;
@@ -3258,15 +3259,54 @@ typedef struct {
     unsigned generation;
 } Avatar;
 
-static Avatar g_avs[AV_MAX];
+static Avatar *g_avs;
 static int g_av_stamp;
+
+/* These 723KiB used to be permanent BSS even after api_free_buffers().
+ * Keep them outside the fixed libc heap so MV can reclaim the partition. */
+typedef struct { Thumb thumbs[THUMB_MAX]; Avatar avatars[AV_MAX]; } ImageCacheStorage;
+static SceUID g_image_cache_block = -1;
+
+/* Main-thread lifecycle only, before starting / after joining the API worker.
+ * Pixel pointers returned to the UI expire at api_free_buffers(), like art. */
+static void image_cache_alloc(void)
+{
+    ImageCacheStorage *storage;
+    if (g_image_cache_block >= 0) return;
+    g_image_cache_block = sceKernelAllocPartitionMemory(2, "melody_images",
+                              PSP_SMEM_High, sizeof(ImageCacheStorage), NULL);
+    if (g_image_cache_block < 0) return;
+    storage = sceKernelGetBlockHeadAddr(g_image_cache_block);
+    if (!storage) {
+        sceKernelFreePartitionMemory(g_image_cache_block);
+        g_image_cache_block = -1;
+        return;
+    }
+    memset(storage, 0, sizeof(*storage));
+    g_thumbs = storage->thumbs;
+    g_avs = storage->avatars;
+}
+
+static void image_cache_release(void)
+{
+    /* A live worker may still own a batch or be writing decoded pixels. */
+    if (g_thid >= 0) return;
+    g_thumb_qn = g_av_qn = 0;
+    ++g_image_generation;
+    g_thumbs = NULL;
+    g_avs = NULL;
+    g_thumb_stamp = g_av_stamp = 0;
+    if (g_image_cache_block >= 0) sceKernelFreePartitionMemory(g_image_cache_block);
+    g_image_cache_block = -1;
+}
+
 
 
 int api_avatar_slot(const char *url)
 {
     int slot = -1, result = -1;
     unsigned now = sceKernelGetSystemTimeLow();
-    if (!url || !url[0] || strlen(url) >= sizeof(g_avs[0].url) || !lock_take(g_lock)) return -1;
+    if (!g_avs || !url || !url[0] || strlen(url) >= sizeof(g_avs[0].url) || !lock_take(g_lock)) return -1;
     for (int i = 0; i < AV_MAX; ++i) {
         if (!strcmp(g_avs[i].url, url)) {
             if (g_avs[i].state == 3 && (unsigned)(now - g_avs[i].fail_t) >= 30000000u) {
@@ -3301,7 +3341,7 @@ int api_avatar_slot(const char *url)
 const unsigned short *api_avatar_px(int slot)
 {
     const unsigned short *px = NULL;
-    if (slot < 0 || slot >= AV_MAX || !lock_take(g_lock)) return NULL;
+    if (!g_avs || slot < 0 || slot >= AV_MAX || !lock_take(g_lock)) return NULL;
     if (g_avs[slot].state == 2) px = g_avs[slot].px;
     lock_give(g_lock);
     return px;
@@ -3311,10 +3351,10 @@ const unsigned short *api_avatar_px(int slot)
 /* Caller holds g_lock. A request may outlive an LRU slot reuse. */
 static int image_request_current(const ImageRequest *r, int avatar)
 {
-    if (avatar) return r->slot >= 0 && r->slot < AV_MAX &&
+    if (avatar) return g_avs && r->slot >= 0 && r->slot < AV_MAX &&
         g_avs[r->slot].state == 1 && g_avs[r->slot].generation == r->generation &&
         !strcmp(g_avs[r->slot].url, r->url);
-    return r->slot >= 0 && r->slot < THUMB_MAX &&
+    return g_thumbs && r->slot >= 0 && r->slot < THUMB_MAX &&
         g_thumbs[r->slot].state == 1 && g_thumbs[r->slot].generation == r->generation &&
         !strcmp(g_thumbs[r->slot].url, r->url);
 }
@@ -5501,6 +5541,7 @@ const SongList *api_result(void) { return &g_pending; }
 
 void api_free_buffers(void)
 {
+    image_cache_release();
     lyric_timing_free();
     g_art_cpu_only = 1; /* MV transition: do not reuse hardware JPEG context. */
     if(g_pending_block>=0)sceKernelFreePartitionMemory(g_pending_block);g_pending_block=-1;g_pending_storage=NULL;
@@ -5558,9 +5599,10 @@ void api_init(void)
     /* Worker is stopped here: retire any in-flight batch abandoned at shutdown. */
     g_daily_preview_pending = g_daily_preview_inflight = 0;
     g_thumb_qn = g_av_qn = 0;
-    for (int i = 0; i < THUMB_MAX; ++i)
+    image_cache_alloc();
+    for (int i = 0; g_thumbs && i < THUMB_MAX; ++i)
         if (g_thumbs[i].state == 1) { g_thumbs[i].state = 0; g_thumbs[i].url[0] = 0; }
-    for (int i = 0; i < AV_MAX; ++i)
+    for (int i = 0; g_avs && i < AV_MAX; ++i)
         if (g_avs[i].state == 1) { g_avs[i].state = 0; g_avs[i].url[0] = 0; }
     if(!net_offline())home_thumbs_restore();
 

@@ -8,6 +8,7 @@ class CommentHeaderOcclusionTests(unittest.TestCase):
         ui = (ROOT / 'src/ui.c').read_text(encoding='utf-8')
         execute(r'''
 #include <assert.h>
+static const char *input_buttons_hint(const char *s){return s;}
 #define MAX_COMMENTS 40
 #include <stdio.h>
 #include <string.h>

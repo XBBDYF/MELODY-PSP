@@ -12,7 +12,7 @@ return {
     if selected==i then ui.rect(x,y,137,34,"#8C1729")end
     ui.text(x+13,y+8,item[1],1,selected==i and"#FFFFFF"or"#24231E")
    end
-   ui.text(22,228,"←→选择  ○打开  SELECT皮肤中心",0,"#756F60")
+   ui.text(22,228,ui.button_hint("←→选择  ○打开  SELECT皮肤中心"),0,"#756F60")
    return true
   elseif page=="player"then
    ui.rect(0,0,480,272,"#F2EFE3");ui.text(20,16,"NOW PLAYING",0,"#8C1729")
@@ -21,7 +21,7 @@ return {
    ui.circle(385,145,57,"#8C1729");ui.circle(385,145,28,"#8C1729")
    ui.rect(380+math.floor(math.cos(angle)*30),140+math.floor(math.sin(angle)*30),10,10,"#8C1729")
    ui.text(20,145,string.format("%d:%02d",m.position_ms//60000,(m.position_ms//1000)%60),2,"#8C1729")
-   ui.text(20,213,"○暂停  L/R切歌  ←→进度  ↑↓音量",0,"#756F60")
+   ui.text(20,213,ui.button_hint("○暂停  L/R切歌  ←→进度  ↑↓音量"),0,"#756F60")
    return true -- stock player input retained by returning false below
   end
   return false

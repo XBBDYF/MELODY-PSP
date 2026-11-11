@@ -7,6 +7,7 @@ R=Path(__file__).resolve().parents[1];O=R/'.tmp/skin-runtime-host';O.mkdir(exist
 (O/'pspiofilemgr.h').write_text('#define PSP_O_RDONLY 0\n#define PSP_O_WRONLY 1\n#define PSP_O_CREAT 256\n#define PSP_O_TRUNC 512\n#define PSP_SEEK_END 2\n#define PSP_SEEK_SET 0\nint sceIoOpen(const char*,int,int);long long sceIoLseek(int,long long,int);int sceIoRead(int,void*,int);int sceIoWrite(int,const void*,int);int sceIoClose(int);int sceIoRemove(const char*);int sceIoRename(const char*,const char*);\n',encoding='ascii')
 (O/'psprtc.h').write_text('typedef struct {int hour,minute;} ScePspDateTime;int sceRtcGetCurrentClockLocalTime(ScePspDateTime*);\n',encoding='ascii')
 (O/'psppower.h').write_text('int scePowerGetBatteryLifePercent(void);\n',encoding='ascii')
+(O/'psputility.h').write_text('#define PSP_SYSTEMPARAM_ID_INT_UNKNOWN 9\nint sceUtilityGetSystemParamInt(int,int*);\n',encoding='ascii')
 code=r'''
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,9 @@ code=r'''
 #include <fcntl.h>
 #include <io.h>
 #include "app.h"
+#include "input_buttons.h"
+void io_lock(void){} void io_unlock(void){}
+int sceUtilityGetSystemParamInt(int id,int *value){(void)id;*value=0;return 0;}
 #include "skin_runtime.h"
 #include "ime.h"
 #include "skin_options.h"
@@ -28,7 +32,7 @@ AppState g_app;SongList g_list;int g_volume=80;
 static unsigned ticks,tick_step=5,native_draw_cost;static int draws,captures,turns,releases;static float last_turn;static unsigned short last_text_color;static char last_text[512];
 void skin_music_fx_draw(int s,float t,int l,unsigned short c){(void)s;(void)t;(void)l;(void)c;}
 void skin_wave_draw(float t,unsigned short c){(void)t;(void)c;}void skin_wave_release(void){}
-void skin_options_load(const char*r,const char*i){(void)r;(void)i;}void skin_options_reset(void){}int skin_options_count(void){return 0;}const SkinOption*skin_options_at(int i){(void)i;return NULL;}int skin_options_set(int i,int v){(void)i;(void)v;return 0;}int skin_options_value(const char*i,int f){(void)i;return f;}
+void skin_options_load(const char*r,const char*i){(void)r;(void)i;}void skin_options_reset(void){}int skin_options_count(void){return 0;}const SkinOption*skin_options_at(int i){(void)i;return NULL;}static int fixture_color=-1;int skin_options_set(int i,int v){(void)i;fixture_color=v;return 0;}int skin_options_value(const char*i,int f){return !strcmp(i,"color_mode")&&fixture_color>=0?fixture_color:f;}
 void lyric_draw_text(int x,int y,int w,const char*t,int f,unsigned short b,unsigned short a,int i,int p,int o){(void)x;(void)y;(void)w;(void)t;(void)f;(void)b;(void)a;(void)i;(void)p;(void)o;}
 float lyric_scroll_position(float v,float target,float dt,int gap){(void)v;(void)dt;(void)gap;return target;}
 int ui_skin_icon(const char*n,int x,int y,int size,unsigned short c){(void)n;(void)x;(void)y;(void)size;(void)c;return 1;}
@@ -98,6 +102,13 @@ if(argc==3&&!strcmp(argv[1],"--ime-model")){
  ime_reset();ime_feed('y');ime_feed('i');g_app.ime_off=400;
  for(int f=0;f<60;++f)if(!skin_runtime_draw(SC_SEARCH,f*.016f,.016f)){fprintf(stderr,"ime model: %s\n",skin_runtime_error());return 1;}
  skin_runtime_reset();puts("PASS all zhu/yi candidates survive Lua model and repeated bounded-heap draws");return 0;}
+if(argc==3&&!strcmp(argv[1],"--eco-palette")){
+ assert(skin_runtime_apply(argv[2],err,sizeof(err))==0);
+ skin_options_set(0,0);skin_runtime_refresh_palette();const SkinStyle*st=skin_runtime_style();unsigned short bg=st->colors[0];
+ skin_options_set(0,1);skin_runtime_refresh_palette();
+ assert(st->colors[0]!=bg&&!st->dark);assert(st->color_mask&1u);
+ unsigned short light=st->colors[0];skin_options_set(0,2);skin_runtime_refresh_palette();assert(st->colors[0]!=light&&st->dark);
+ skin_runtime_reset();puts("PASS ECO palette changes full native fallback+chrome colors and dark mode");return 0;}
 if(argc==3&&!strcmp(argv[1],"--source-bindings")){
  enable_fixture=1;daily_fixture.id=111;strcpy(daily_fixture.art,"daily-cover");home_fixture.count=2;strcpy(home_fixture.items[0].cover,"recommend-one");strcpy(home_fixture.items[1].cover,"recommend-two");
  assert(skin_runtime_apply(argv[2],err,sizeof(err))==0);assert(skin_runtime_draw(SC_HOME,1,.016f));assert(bound_count==2&&!strcmp(bound_urls[0],"daily-cover")&&!strcmp(bound_urls[1],"recommend-two")&&avatar_requests==1);puts("PASS actual tile_cover chooses daily snapshot and requested recommendation index; avatar uses account cache");skin_runtime_reset();return 0;}
@@ -127,6 +138,11 @@ if(argc==3&&!strcmp(argv[1],"--slow-device")){
  int pages[]={SC_SETTINGS,SC_MINE,SC_HOME,SC_SEARCH,SC_PLAYER,SC_CACHE};
  for(int i=0;i<6;++i){int rc=skin_runtime_draw(pages[i],i+1,.033f);if(rc<=0){fprintf(stderr,"SLOW_DEVICE page=%d fell back: %s\n",pages[i],skin_runtime_error());return 1;}}
  assert(skin_runtime_error()[0]==0);puts("PASS slow-device rendering/preemption never deactivates Metro");skin_runtime_reset();return 0;}
+ if(argc==3&&!strcmp(argv[1],"--button-hints")){
+  assert(skin_runtime_apply(argv[2],err,sizeof(err))==0);
+  strcpy(g_app.query,"query ○ ×");Song song={0};strcpy(song.name,"song ○ ×");strcpy(song.artist,"artist ○ ×");skin_runtime_set_playback(&song,1,0,1000);
+  for(int cross=0;cross<=1;++cross){assert(input_buttons_set_mode(cross)==0);assert(skin_runtime_draw(SC_HOME,1,.016f));assert(skin_runtime_input(SC_HOME,1u<<4,0,.016f));}
+  skin_runtime_reset();puts("PASS real button hint API: live modes, Lua model, semantic keys, unchanged query/song/artist");return 0;}
  assert(argc==8);SkinModule modules[]={{"songs",module,NULL},{"account",module,NULL}};skin_runtime_register(modules,2);
  assert(skin_runtime_validate(argv[1],err,sizeof(err))==0);assert(skin_runtime_apply(argv[1],err,sizeof(err))==0);assert(skin_runtime_active()&&!strcmp(skin_runtime_style()->id,"ocean"));
  assert(skin_runtime_validate(argv[2],err,sizeof(err))==0);assert(skin_runtime_apply(argv[2],err,sizeof(err))==0);assert(skin_runtime_draw(SC_HOME,1,.016f)>0&&draws>0);for(int frame=0;frame<900;++frame)assert(skin_runtime_draw(SC_HOME,frame/60.f,.016f)>0);g_app.time=20;skin_runtime_input(SC_HOME,1u<<3,1u<<3,.016f);for(int hold=1;hold<=10;++hold){g_app.time=20+hold*.016f;skin_runtime_input(SC_HOME,0,1u<<3,.016f);}skin_runtime_input(SC_HOME,1u<<4,0,.016f);skin_runtime_draw(SC_HOME,g_app.time,.016f);g_app.time+=.6f;skin_runtime_input(SC_HOME,0,0,.016f);assert(skin_runtime_action(action,sizeof(action),arg,sizeof(arg))&& !strcmp(action,"square"));
@@ -154,7 +170,7 @@ void skin_font_release(void){}
 int skin_font_bytes(void){return 0;}
 const char *skin_font_last_error(void){return "";}
 """
-(O/'test.c').write_text(code+FONT_STUBS,encoding='utf-8');names=(R/'tools/prxloader/lua_sources.txt').read_text(encoding='ascii').splitlines();exe=O/'runtime.exe';cmd=['D:/msys64/ucrt64/bin/gcc.exe','-std=c99','-O1','-Wall','-Wextra','-Wno-misleading-indentation','-DLUA_32BITS','-DLUAI_MAXCCALLS=40','-I'+str(O),'-I'+str(R/'src'),'-I'+str(R/'third_party/lua-5.4.7'),O/'test.c',R/'src/skin_runtime.c',R/'src/json.c',R/'src/ime.c',R/'src/ime_pack.c',R/'src/overclock_bridge.c',R/'src/search_history.c',*[R/n for n in names],'-lm','-o',exe]
+(O/'test.c').write_text(code+FONT_STUBS,encoding='utf-8');names=(R/'tools/prxloader/lua_sources.txt').read_text(encoding='ascii').splitlines();exe=O/'runtime.exe';cmd=['D:/msys64/ucrt64/bin/gcc.exe','-std=c99','-O1','-Wall','-Wextra','-Wno-misleading-indentation','-DLUA_32BITS','-DLUAI_MAXCCALLS=40','-I'+str(O),'-I'+str(R/'src'),'-I'+str(R/'third_party/lua-5.4.7'),O/'test.c',R/'src/skin_runtime.c',R/'src/input_buttons.c',R/'src/json.c',R/'src/ime.c',R/'src/ime_pack.c',R/'src/overclock_bridge.c',R/'src/search_history.c',*[R/n for n in names],'-lm','-o',exe]
 subprocess.run(cmd,cwd=R,check=True,timeout=90)
 with tempfile.TemporaryDirectory(prefix='melody-skin-runtime-')as td:
  p=Path(td);args=[R/'skin_release/melody/skins/ocean',R/'skin_release/melody/skins/metro']
@@ -190,3 +206,11 @@ with tempfile.TemporaryDirectory(prefix='melody-ime-model-') as td:
  (probe/'skin.json').write_text(json.dumps({'schema':1,'id':'imeprobe','name':'imeprobe','script':'skin.lua'}),encoding='utf-8')
  (probe/'skin.lua').write_text('return {draw=function(page,t,dt,m) if m.ime_active==1 then local c=m.ime_candidates; if m.ime_pre=="zhu" then local ok=false; for _,v in ipairs(c)do if v=="祝"then ok=true end end assert(m.ime_total>15 and #c<=4) elseif m.ime_pre=="yi"then assert(m.ime_total>400 and #c<=4)end end return true end}',encoding='utf-8')
  subprocess.run([exe,'--ime-model',probe],cwd=R,check=True,timeout=15)
+
+with tempfile.TemporaryDirectory(prefix='melody-button-hints-') as td:
+ probe=Path(td)/'buttons';probe.mkdir()
+ (probe/'skin.json').write_text(json.dumps({'schema':1,'id':'buttons','name':'buttons','script':'skin.lua'}),encoding='utf-8')
+ (probe/'skin.lua').write_text('return {draw=function(page,t,dt,m) local cross=m.button_cross_confirm==1;assert(m.confirm_key==(cross and "×" or "○"));assert(m.cancel_key==(cross and "○" or "×"));assert(ui.button_hint("○ confirm / × cancel")== (cross and "× confirm / ○ cancel" or "○ confirm / × cancel"));assert(m.query=="query ○ ×" and m.song=="song ○ ×" and m.artist=="artist ○ ×");return true end,input=function(page,t,dt,m,k) assert(k.confirm==16 and k.back==32 and k.pressed==16);return true end}',encoding='utf-8')
+ subprocess.run([exe,'--button-hints',probe],cwd=Path(td),check=True,timeout=15)
+
+subprocess.run([exe,"--eco-palette",R/"skin_release/melody/skins/eco"],cwd=R,check=True,timeout=15)

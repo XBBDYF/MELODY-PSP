@@ -32,8 +32,9 @@ class SkinInputEdges(unittest.TestCase):
         consume = extract(source, r"if\([^\n]*g_app.screen!=SC_SKINS[^\n]*skin_runtime_input[^\n]*;")
         # Keep the actual consumption assignment; the harness models Metro home=true.
         consume = consume.split("skin_runtime_input", 1)[1].split("))", 1)[1]
-        tail = extract(source, r"g_pending_press\s*\|=\s*\(pad2.Buttons\s*&\s*~(?:sampled_held|held)\)\s*;")
+        tail = extract(source, r"g_pending_press\s*\|=\s*\(input_buttons_translate\(pad2.Buttons\)\s*&\s*~(?:sampled_held|held)\)\s*;")
         code = """
+        static unsigned input_buttons_translate(unsigned p){return p;}
         unsigned run(const unsigned *samples, unsigned frames, int handled,
                      int snapshot, unsigned *trace) {
             unsigned g_prev_btn=0, g_pending_press=0, count=0;

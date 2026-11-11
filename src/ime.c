@@ -2,7 +2,7 @@
  * MELODY PSP — 输入法核心（拼音 / 日语假名）
  *
  * 设计要点见 docs/IME.md：
- *   - 拼音键是「无声调全拼连写」，所以不需要切分音节，前缀匹配即可；
+ *   - 拼音词条按全拼前缀匹配；单字按最长合法首音节逐段提交；
  *   - 日语先做罗马字→平假名（确定性），再用读音在词库里查汉字候选；
  *     不做分词/Viterbi，词条级匹配够用于搜索框；
  *   - 候选保存紧凑索引；文本仅按可见窗口读取，详见 docs/IME-PACK.md。
@@ -25,7 +25,12 @@ static char g_pre[IME_PRE_MAX];       /* 拼音：字母；假名：罗马字缓
 static char g_kana[IME_PRE_MAX];      /* 假名：已转换的平假名（UTF-8） */
 typedef struct { uint32_t id, score; } CandidateRef;
 static CandidateRef *g_refs;
-static int g_ref_cap, g_counting, g_needed;
+static int g_ref_cap, g_ref_failed;
+static char g_resume_path[512];
+static int g_suspended;
+static char g_assoc_key[IME_PRE_MAX];
+static char g_assoc_words[32][IME_WORD_MAX];
+static int g_assoc_valid,g_assoc_max,g_assoc_n;
 static unsigned char g_seen_chars[8192];
 static char g_cand[8][IME_WORD_MAX];
 static char g_kata[IME_PRE_MAX];
@@ -212,7 +217,13 @@ static void dictionary_range(int kind,const char *key,int *lo,int *hi) {
  *hi=a;
 }
 static void ref_add(int kind,unsigned int id,uint32_t score) {
- if(g_counting) { ++g_needed;return; }
+ if(g_ref_failed)return;
+ if(g_cand_n==g_ref_cap) {
+  int cap=g_ref_cap?g_ref_cap*2:256;
+  CandidateRef *next=(CandidateRef*)realloc(g_refs,(size_t)cap*sizeof(*next));
+  if(!next){g_ref_failed=1;return;}
+  g_refs=next;g_ref_cap=cap;
+ }
  if(g_cand_n<g_ref_cap) { g_refs[g_cand_n].id=((unsigned)kind<<30)|id;g_refs[g_cand_n++].score=score; }
 }
 static int ref_compare(const void *a,const void *b) {
@@ -251,8 +262,21 @@ static void char_candidates(const char *prefix) {
   }
  }
 }
+/* The character table is the authoritative set of legal syllables.  Prefer the
+ * longest complete syllable; incomplete initials still use prefix expansion. */
+static void first_syllable(const char *pre,char out[IME_PRE_MAX]) {
+ size_t len=strlen(pre);if(len>6)len=6;
+ for(;len;len--) {
+  memcpy(out,pre,len);out[len]=0;
+  if(g_pack) {
+   int lo,hi;ImePackEntry e;dictionary_range(2,out,&lo,&hi);
+   if(lo<hi&&dictionary_read(2,lo,&e)&&!strcmp(e.key,out))return;
+  } else for(int i=0;i<k_ime_chars_count;i++)if(!strcmp(k_ime_chars[i].key,out))return;
+ }
+ snprintf(out,IME_PRE_MAX,"%s",pre);
+}
 static void build_refs(void) {
- if(g_mode==IME_PINYIN) { if(!g_pre[0])return;collect(0,g_pre);char_candidates(g_pre); }
+ if(g_mode==IME_PINYIN) { if(!g_pre[0])return;char syllable[IME_PRE_MAX];first_syllable(g_pre,syllable);collect(0,g_pre);char_candidates(syllable); }
  else if(g_mode==IME_KANA) {
   if(g_kana[0]) { collect(1,g_kana);ref_add(3,0,3);ref_add(3,1,2); }
   if(g_pre[0])ref_add(3,2,1);
@@ -272,13 +296,8 @@ static void kana_finish(void)
 
 static void rebuild_candidates(void)
 {
- cand_clear();g_needed=0;g_counting=1;build_refs();g_counting=0;
- if(g_needed>g_ref_cap) {
-  CandidateRef *next=(CandidateRef*)realloc(g_refs,(size_t)g_needed*sizeof(*g_refs));
-  if(!next)return;
-  g_refs=next;g_ref_cap=g_needed;
- }
- build_refs();
+ cand_clear();g_ref_failed=0;build_refs();
+ if(g_ref_failed)cand_clear();
  if(g_cand_n>1)qsort(g_refs,(size_t)g_cand_n,sizeof(*g_refs),ref_compare);
  hira_to_kata(g_kana,g_kata,sizeof(g_kata));
 }
@@ -352,8 +371,9 @@ int ime_candidate_window(int first,char out[][IME_WORD_MAX],int max)
 }
 void ime_activate_pack(ImePack *prepared)
 {
- ImePack *old=g_pack;if(prepared==old)return;
- ime_reset();free(g_refs);g_refs=NULL;g_ref_cap=0;g_pack=prepared;ime_pack_close(old);
+ ImePack *old=g_pack;if(prepared&&prepared==old)return;
+ ime_reset();g_suspended=0;g_assoc_valid=0;free(g_refs);g_refs=NULL;g_ref_cap=0;g_pack=prepared;ime_pack_close(old);
+ snprintf(g_resume_path,sizeof(g_resume_path),"%s",ime_pack_path(prepared));
 }
 /* Read only a short basename, never a path supplied by a pointer file. */
 static int active_basename(const char *path,char name[81])
@@ -391,6 +411,18 @@ int ime_load_dictionary(const char *app_dir)
  }
  snprintf(path,sizeof(path),"%scurrent.bin",directory);
  r=ime_pack_prepare(path,&p);ime_activate_pack(p);return r;
+}
+void ime_suspend_dictionary(void) {
+ if(g_suspended)return;
+ char path[sizeof(g_resume_path)];snprintf(path,sizeof(path),"%s",g_resume_path);
+ ime_activate_pack(NULL);snprintf(g_resume_path,sizeof(g_resume_path),"%s",path);g_suspended=path[0]!=0;
+}
+int ime_resume_dictionary(void) {
+ ImePack *p=NULL;int r;
+ if(!g_suspended)return 0;
+ g_suspended=0;
+ if(g_pack||!g_resume_path[0])return 0;
+ r=ime_pack_prepare(g_resume_path,&p);if(!r)ime_activate_pack(p);return r;
 }
 unsigned int ime_dictionary_revision(void) { return ime_pack_revision(g_pack); }
 
@@ -482,7 +514,13 @@ int ime_select(int i, char *out, int cap)
     if(!word[0]||strlen(word)>=(size_t)cap)return 0;
     snprintf(out, (size_t)cap, "%s", word);
     snprintf(g_last, sizeof(g_last), "%s", word);
-    ime_reset();
+    if(g_mode==IME_PINYIN&&(g_refs[i].id>>30)==IME_PACK_CHAR) {
+        ImePackEntry e;unsigned id=g_refs[i].id&0x3fffffffu;
+        if(dictionary_read(IME_PACK_CHAR,(int)id,&e)&&strlen(e.key)<strlen(g_pre)&&!strncmp(g_pre,e.key,strlen(e.key))) {
+            memmove(g_pre,g_pre+strlen(e.key),strlen(g_pre)-strlen(e.key)+1);
+            rebuild_candidates();
+        } else ime_reset();
+    } else ime_reset();
     return (int)strlen(out);
 }
 
@@ -491,10 +529,13 @@ int ime_assoc(const char *text,char out[][IME_WORD_MAX],int max)
  uint32_t scores[32];int n=0,latin=1,lo=0,hi;size_t tl;
  if(!text||!*text||!out||max<=0)return 0;
  if(max>32)max=32;
+ if(g_assoc_valid&&g_assoc_max==max&&!strcmp(g_assoc_key,text)) {
+  memcpy(out,g_assoc_words,(size_t)g_assoc_n*IME_WORD_MAX);return g_assoc_n;
+ }
  tl=strlen(text);for(size_t i=0;i<tl;i++)if((unsigned char)text[i]>=128)latin=0;
  hi=dictionary_count(0);if(latin)dictionary_range(0,text,&lo,&hi);
  for(int kind=0;kind<2;kind++) {
-  int begin=kind==0?lo:0,end=kind==0?hi:dictionary_count(1);
+  int begin=kind==0?lo:0,end=kind==0?hi:latin?0:dictionary_count(1);
   for(int i=begin;i<end;i++) {
    ImePackEntry e;int pos,dup=0;if(!dictionary_read(kind,i,&e))continue;
    if((!latin||kind==1)&&strncmp(e.word,text,tl))continue;
@@ -505,6 +546,10 @@ int ime_assoc(const char *text,char out[][IME_WORD_MAX],int max)
    while(pos>0&&scores[pos-1]<e.freq){if(pos<max){scores[pos]=scores[pos-1];memcpy(out[pos],out[pos-1],IME_WORD_MAX);}pos--;}
    if(pos<max){scores[pos]=e.freq;snprintf(out[pos],IME_WORD_MAX,"%s",e.word);if(n<max)n++;}
   }
+ }
+ if(tl<sizeof(g_assoc_key)) {
+  snprintf(g_assoc_key,sizeof(g_assoc_key),"%s",text);g_assoc_max=max;g_assoc_n=n;g_assoc_valid=1;
+  memcpy(g_assoc_words,out,(size_t)n*IME_WORD_MAX);
  }
  return n;
 }

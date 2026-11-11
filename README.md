@@ -573,3 +573,15 @@ MELODY 以 **GNU General Public License v3.0** 发布，见 [LICENSE](LICENSE)�
   <img src="docs/assets/qq-group.png" alt="PSP 网易云交流群 1103558445" width="240">
 </p>
 <p align="center"><sub>扫码加群：PSP 网易云交流群（1103558445）</sub></p>
+
+
+
+
+# 确认键设置（开发构建）
+
+设置→确认键提供“跟随系统 / ○确认×取消 / ×确认○取消”，保存到本机buttons.cfg并在重启后恢复。
+默认读取PSP系统按钮偏好，读取失败回退○确认。原生页面/对话框/极致省电播放器/官方Lua主题提示同步切换；系统联网窗口仍用PSP系统自身设置。
+歌曲名、搜索文字与歌词不做符号替换。Lua主题可用ui.button_hint(text)映射提示，并读取confirm_key/cancel_key/button_cross_confirm；k.confirm/k.back保持逻辑语义，不重复交换。
+
+
+极致省电列表支持←→每次快移8首，□独立切本地/完整缓存；START选项增加单曲循环。修复普通模式EOF后只seek无法重启已结束decoder、未知时长无法循环，以及极致模式忽略单曲循环直接下一首的问题。回归与模拟器结果单独记录，物理PSP仍需复测。

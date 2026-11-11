@@ -14,6 +14,7 @@
  */
 
 #include "ui.h"
+#include "input_buttons.h"
 #include "power_runtime.h"
 #include "ime_update.h"
 #include "overclock_dialog.h"
@@ -756,6 +757,7 @@ static void hint_begin(void)
 
 static void hint_item(const char *key, const char *label)
 {
+    key = input_buttons_hint(key);
     int y = hint_y();
     int kw = gfx_text_w(FS_SM, key) + 6;
     int lw = gfx_text_w(FS_SM, label);
@@ -844,7 +846,7 @@ static void player_bar_draw(void)
             icon_download(SCR_W - 52, y + 24, 4, C_OK, 220);
             gfx_text_right(FS_SM, SCR_W - 56, y + 19, "已缓存", C_OK);
         } else {
-            gfx_text_right(FS_SM, SCR_W - 14, y + 19, g_app.paused ? "○ 继续" : "△ 播放页",
+            gfx_text_right(FS_SM, SCR_W - 14, y + 19, g_app.paused ? input_buttons_hint("○ 继续") : "△ 播放页",
                            C_PSUB);
         }
     }
@@ -879,7 +881,7 @@ static void confirm_draw(void)
     gfx_text_center(FS_MD, x, w, y + 16, title, C_TXT);
     if (sub[0]) gfx_text_center(FS_SM, x, w, y + 42, sub, C_SUB);
     modal_fill(x + (w - 108) / 2, y + h - 28, 108, 20, 10, C_ACC);
-    gfx_text_center(FS_SM, x + (w - 108) / 2, 108, y + h - 24, "○ 确定   × 取消", C_WHITE);
+    gfx_text_center(FS_SM, x + (w - 108) / 2, 108, y + h - 24, input_buttons_hint("○ 确定   × 取消"), C_WHITE);
 }
 
 /* 启动时静默检查到新版本 → 模态弹窗：版本 + 更新日志 + 稍后/立即更新 */
@@ -916,19 +918,19 @@ static void upd_dialog_draw(void)
         else snprintf(line, sizeof(line), "下载中 %d%%", pct);
         gfx_text(FS_SM, x + 20, y + h - 48, line, C_ACC);
         progress_bar(x + 20, y + h - 30, w - 40, 6, pct, C_ACC, C_PANEL2);
-        gfx_text(FS_SM, x + 20, y + h - 18, "× 取消下载", C_MUTE);
+        gfx_text(FS_SM, x + 20, y + h - 18, input_buttons_hint("× 取消下载"), C_MUTE);
     } else if (st == 5) {
         gfx_text(FS_SM, x + 20, y + h - 34, "下载完成，重启 MELODY 后生效", C_OK);
         modal_fill(x + w - 116, y + h - 40, 96, 26, 13, C_ACC);
-        gfx_text_center(FS_SM, x + w - 116, 96, y + h - 34, "○ 好", C_WHITE);
+        gfx_text_center(FS_SM, x + w - 116, 96, y + h - 34, input_buttons_hint("○ 好"), C_WHITE);
     } else if (st == 6) {
         gfx_text_ellipsis(FS_SM, x + 20, y + h - 34, w - 140, api_update_message(), C_WARN);
         modal_fill(x + w - 116, y + h - 40, 96, 26, 13, C_ACC);
-        gfx_text_center(FS_SM, x + w - 116, 96, y + h - 34, "○ 关闭", C_WHITE);
+        gfx_text_center(FS_SM, x + w - 116, 96, y + h - 34, input_buttons_hint("○ 关闭"), C_WHITE);
     } else if(st==3){
         int bw = 120;
-        const char *a = "× 稍后";
-        const char *b = "○ 立即更新";
+        const char *a = input_buttons_hint("× 稍后");
+        const char *b = input_buttons_hint("○ 立即更新");
 
         modal_fill(x + w - 2 * bw - 30, y + h - 40, bw, 26, 13,
                        g_app.upd_sel == 0 ? C_ACC : C_PANEL2);
@@ -938,7 +940,7 @@ static void upd_dialog_draw(void)
                        g_app.upd_sel == 1 ? C_ACC : C_PANEL2);
         gfx_text_center(FS_SM, x + w - bw - 16, bw, y + h - 34, b,
                         g_app.upd_sel == 1 ? C_WHITE : C_SUB);
-    }else gfx_text(FS_SM,x+20,y+h-26,st==1?"× 返回（后台继续检查）":"○ / × 关闭",C_SUB);
+    }else gfx_text(FS_SM,x+20,y+h-26,st==1?input_buttons_hint("× 返回（后台继续检查）"):input_buttons_hint("○ / × 关闭"),C_SUB);
 }
 
 /* ==== PART2 ==== */
@@ -1033,7 +1035,7 @@ static void screen_boot(float t)
     }
 
     gfx_text_center(FS_SM, 0, SCR_W, 246,
-                    g_app.online ? "○ 网络设置 · SELECT 系统设置" : "○ 选择网络连接", C_MUTE);
+                    g_app.online ? input_buttons_hint("○ 网络设置 · SELECT 系统设置") : input_buttons_hint("○ 选择网络连接"), C_MUTE);
 
     if (a < 255) gfx_fill_rect_a(0, 0, SCR_W, SCR_H, C_WHITE, 255 - a);
 }
@@ -1562,7 +1564,7 @@ static void player_menu_draw(void)
             gfx_text_right(FS_SM, x + w - 16, iy + 4, q[g_app.quality % 3], C_MUTE);
         }
     }
-    if(is_metro_style())gfx_text(FS_SM,x+14,y+h-15,"↑↓选择  ○执行  ×关闭",C_MUTE);
+    if(is_metro_style())gfx_text(FS_SM,x+14,y+h-15,input_buttons_hint("↑↓选择  ○执行  ×关闭"),C_MUTE);
 }
 
 /* 右上角时钟：HH:MM（本地时间） */
@@ -2076,8 +2078,8 @@ static void screen_search(float t, float dt)
         }
 
         {
-            const char *tip = ime_n > 0 ? "○ 上屏 · △ 联想 · □ 中/日/英 · ← 删除"
-                                        : "↑↓←→ 选键 · ○ 确认 · △ 联想 · □ 中/日";
+            const char *tip = ime_n > 0 ? input_buttons_hint("○ 上屏 · △ 联想 · □ 中/日/英 · ← 删除")
+                                        : input_buttons_hint("↑↓←→ 选键 · ○ 确认 · △ 联想 · □ 中/日");
 
             if (g_app.search_state == 1) tip = "正在搜索 ...";
             else if (g_app.search_state == 3) tip = "没有结果，换个拼音/假名试试";
@@ -2346,7 +2348,7 @@ static void screen_download_mv(float t, float dt)
 
         gfx_text_ellipsis(FS_MD, 20, y + 6, SCR_W - 190, it->name, C_TXT);
         gfx_text_ellipsis(FS_SM, 20, y + 26, SCR_W - 230, it->artist, C_MUTE);
-        gfx_text_right(FS_SM, SCR_W - 20, y + 6, live ? "下载中" : it->state==3?"未完成 · ○继续":"已完成", col);
+        gfx_text_right(FS_SM, SCR_W - 20, y + 6, live ? "下载中" : it->state==3?input_buttons_hint("未完成 · ○继续"):"已完成", col);
         if (live && total_bytes > 0) fmt_done_total(sz, sizeof(sz), done_bytes, total_bytes);
         else if (live) fmt_size(sz, sizeof(sz), done_bytes);
         else fmt_size(sz, sizeof(sz), it->size > 0 ? it->size : 0);
@@ -2541,7 +2543,7 @@ static const SetDef g_set_defs[SET_ITEMS] = {
  {0,"音质"},{0,"音量"},{2,"下载并发"},{4,"皮肤中心"},{2,"网络连接"},{4,"内存显示"},
  {3,"清空下载队列"},{3,"清空缓存"},{5,"账号与登录"},{6,"检查更新"},{6,"关于 MELODY"},
  {2,"备用音源"},{1,"视频解码"},{1,"软解画质"},{1,"视频加载"},{1,"软解格式"},
- {1,"MV清晰度"},{1,"提前缓冲"},{6,"公告"},{5,"隐私政策"},{4,"显示网速"},{0,"预下载后续歌曲"},{4,"界面渲染"},{4,"唱片播放器"},{1,"本地 MV 搜索"},{4,"省电模式"},{4,"自动息屏"},{4,"SoC 时钟"},{6,"更新输入法词库"},{4,"外部超频插件"}
+ {1,"MV清晰度"},{1,"提前缓冲"},{6,"公告"},{5,"隐私政策"},{4,"显示网速"},{0,"预下载后续歌曲"},{4,"界面渲染"},{4,"唱片播放器"},{1,"本地 MV 搜索"},{4,"省电模式"},{4,"自动息屏"},{4,"SoC 时钟"},{6,"更新输入法词库"},{4,"外部超频插件"},{4,"确认键"}
 };
 
 /* 把 [top,bottom) 这段保持在可视区里（不是钉在顶部，避免把页头滚没） */
@@ -2560,6 +2562,7 @@ static float follow_visible(float scroll, int top, int bottom, int view_top,
 static void settings_value(int i, char *val, int len)
 {
     val[0] = 0;
+    if(i==30){int m=input_buttons_mode();snprintf(val,len,"%s%s",m<0?"跟随系统 / ":"",input_buttons_cross_confirm()?"×确认 ○取消":"○确认 ×取消");return;}
     if(i==29){snprintf(val,len,"%s",overclock_bridge_owns_clock()?"外部接管（非实测MHz）":"未启用（需opicker）");return;}
     if(i==28){if(ime_update_busy())snprintf(val,len,"下载/校验 %d%%",ime_update_percent());else snprintf(val,len,"%.90s",ime_update_message());return;}
     if(i>=25&&i<=27&&power_runtime_locked()){snprintf(val,len,"皮肤接管（锁定）");return;}
@@ -2853,7 +2856,7 @@ static void screen_login(float t, float dt)
 
             gfx_text(FS_SM, x, 140, state, sc == 803 ? C_OK : C_ACC);
             if (sc == 800 || sc == -1 || sc == 8821)
-                gfx_text(FS_SM, x, 158, "按 ○ 重新获取", C_MUTE);
+                gfx_text(FS_SM, x, 158, input_buttons_hint("按 ○ 重新获取"), C_MUTE);
 
             gfx_text(FS_SM, x, 186, "扫不了可以导入 cookie.txt", C_MUTE);
         }
@@ -2893,7 +2896,7 @@ static void screen_grid(float t, float dt)
 
     if (cl->count == 0) {
         gfx_text_center(FS_MD, 0, SCR_W, 108, "没有内容", C_SUB);
-        gfx_text_center(FS_SM, 0, SCR_W, 132, "按 ○ 重新加载", C_ACC);
+        gfx_text_center(FS_SM, 0, SCR_W, 132, input_buttons_hint("按 ○ 重新加载"), C_ACC);
     }
 
     for (int i = 0; i < 10; ++i) {
@@ -3106,7 +3109,7 @@ static void screen_comments(float t, float dt)
             if (c->id && c->id == v->expanded) {
                 int ry = y + body;
                 const char *status = api_comment_replies_loading(c->id) ? "回复加载中..." :
-                    (api_comment_replies_failed(c->id) ? "加载失败，○关闭后重试" :
+                    (api_comment_replies_failed(c->id) ? input_buttons_hint("加载失败，○关闭后重试") :
                      (!r->count ? "暂无回复" : (r->more ? "楼层回复（显示前32条）" : "楼层回复")));
                 if(metro)gfx_fill_rect(56,ry,2,h-body-3,C_ACC);
                 gfx_text(FS_SM,68,ry,status,metro?C_ACC:C_SUB);ry+=20;
@@ -3330,7 +3333,7 @@ static void screen_wifi_metro(float t, float dt)
         if(g_app.connecting==1)spinner_draw(SCR_W-22,bottom-10,t);
     }
     gfx_fill_rect(0,hint_y(),SCR_W,UI_HINT_H,C_PANEL2);
-    gfx_text(FS_SM,12,hint_y()+1,"○ 连接   △ 系统设置   SELECT 刷新   × 返回",C_TXT);
+    gfx_text(FS_SM,12,hint_y()+1,input_buttons_hint("○ 连接   △ 系统设置   SELECT 刷新   × 返回"),C_TXT);
     (void)dt;
 }
 
@@ -3468,7 +3471,7 @@ static void screen_skins(float time,float dt){
     const SkinCatalogEntry*items=skin_catalog_items();int count=api_skin_busy()?0:skin_catalog_count();
     if(!api_skin_busy()&&g_app.skin_sel>count)g_app.skin_sel=count;
     int top=62,row=38,view=content_bottom()-top;scroll_follow(&g_app.skin_scroll,g_app.skin_sel,row,view,dt);
-    gfx_set_clip(8,top,238,content_bottom());for(int i=0;i<=count;++i){int y=top+i*row-(int)g_app.skin_scroll;if(y<top-row||y>=content_bottom())continue;if(i==g_app.skin_sel)row_focus(10,y,225,36);gfx_text_ellipsis(FS_MD,18,y+3,211,i?items[i-1].name:"系统默认",i==g_app.skin_sel?C_ACC:C_TXT);if(i){char row_detail[96],installed_version[24]={0};if(items[i-1].installed){int slot=i-1;if(strcmp(row_ids[slot],items[slot].id)){snprintf(row_ids[slot],sizeof(row_ids[slot]),"%s",items[slot].id);row_versions[slot][0]=0;skin_catalog_local_version(items[slot].id,row_versions[slot],sizeof(row_versions[slot]));}snprintf(installed_version,sizeof(installed_version),"%s",row_versions[slot]);}snprintf(row_detail,sizeof(row_detail),"%s · %s",installed_version[0]?installed_version:items[i-1].version,items[i-1].installed?"○应用":"○安装");gfx_text_ellipsis(FS_SM,18,y+23,211,row_detail,C_MUTE);}else gfx_text(FS_SM,18,y+23,"恢复原始界面",C_MUTE);}gfx_reset_clip();
+    gfx_set_clip(8,top,238,content_bottom());for(int i=0;i<=count;++i){int y=top+i*row-(int)g_app.skin_scroll;if(y<top-row||y>=content_bottom())continue;if(i==g_app.skin_sel)row_focus(10,y,225,36);gfx_text_ellipsis(FS_MD,18,y+3,211,i?items[i-1].name:"系统默认",i==g_app.skin_sel?C_ACC:C_TXT);if(i){char row_detail[96],installed_version[24]={0};if(items[i-1].installed){int slot=i-1;if(strcmp(row_ids[slot],items[slot].id)){snprintf(row_ids[slot],sizeof(row_ids[slot]),"%s",items[slot].id);row_versions[slot][0]=0;skin_catalog_local_version(items[slot].id,row_versions[slot],sizeof(row_versions[slot]));}snprintf(installed_version,sizeof(installed_version),"%s",row_versions[slot]);}snprintf(row_detail,sizeof(row_detail),"%s · %s",installed_version[0]?installed_version:items[i-1].version,items[i-1].installed?input_buttons_hint("○应用"):input_buttons_hint("○安装"));gfx_text_ellipsis(FS_SM,18,y+23,211,row_detail,C_MUTE);}else gfx_text(FS_SM,18,y+23,"恢复原始界面",C_MUTE);}gfx_reset_clip();
     if(skin_catalog_install_error()[0])gfx_text_ellipsis(FS_SM,245,43,230,skin_catalog_install_error(),C_WARN);
     else gfx_text_ellipsis(FS_SM,245,43,230,"SELECT · 当前主题设置 / 颜色",C_MUTE);
     if(g_app.skin_sel>0&&g_app.skin_sel<=count){const SkinCatalogEntry*entry=&items[g_app.skin_sel-1];
@@ -3559,8 +3562,8 @@ void ui_draw(void)
     }else if(g_app.busy&&g_app.screen!=SC_BOOT&&g_app.screen!=SC_SEARCH)spinner_draw(g_app.busy_x,14,g_app.spinner);
 
     if(!custom||!skin_runtime_style()->hide_status)screen_net_speed();
-    {
-        const char *mode=!power_runtime_eco()?"常规模式":(power_runtime_ultra()?"极致省电":(power_runtime_locked()?"省电·皮肤":"省电·手动"));
+    if(power_runtime_eco()){
+        const char *mode=power_runtime_ultra()?"极致省电":(power_runtime_locked()?"省电·皮肤":"省电·手动");
         gfx_fill_rect(202,2,82,16,C_PANEL2);gfx_text(FS_SM,205,4,mode,C_ACC);
     }
     export_progress_draw();

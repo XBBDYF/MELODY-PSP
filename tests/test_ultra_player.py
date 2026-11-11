@@ -34,6 +34,7 @@ class UltraPlayerTest(unittest.TestCase):
             (work / 'song.jpg').write_bytes(b'jpeg fixture')
             harness = r'''
 #include <assert.h>
+const char *input_buttons_hint(const char *s){return s;}
 void io_lock(void){}
 void io_unlock(void){}
 #include <stdio.h>
@@ -98,6 +99,14 @@ int main(void){
  ultra_player_tick(PSP_CTRL_CIRCLE,0,0);assert(clock_mhz==66);
  ultra_player_tick(PSP_CTRL_START,0,0);for(int i=0;i<10;i++)ultra_player_draw();assert(decodes==1);
  ultra_player_tick(PSP_CTRL_CROSS,0,0);ultra_player_tick(PSP_CTRL_SQUARE,0,0);ultra_player_tick(PSP_CTRL_CIRCLE,0,0);assert(!g_app.now.id);
+ count=30;fail=0;ultra_player_enter();
+ ultra_player_tick(PSP_CTRL_RIGHT,0,0);assert(g_app.local_sel==8);assert(!u.tab);
+ ultra_player_tick(PSP_CTRL_RIGHT,0,0);assert(g_app.local_sel==16);
+ ultra_player_tick(PSP_CTRL_LEFT,0,0);assert(g_app.local_sel==8);
+ ultra_player_tick(PSP_CTRL_CIRCLE,0,0);int repeat_index=g_app.playing_index,repeat_starts=starts;
+ g_app.play_mode=2;state=AUDIO_END;ultra_player_tick(0,0,0);assert(g_app.playing_index==repeat_index&&starts==repeat_starts+1);
+ assert(g_app.play_mode==2);
+ g_app.play_mode=0;state=AUDIO_END;ultra_player_tick(0,0,0);assert(g_app.playing_index==repeat_index+1);
  puts("offline player behavior passed");return 0;
 }
 '''

@@ -16,7 +16,7 @@ local function draw(t,m)
  label(146,mode.." / SoC "..tostring(m.power_effective_clock or 0).." MHz",0,C.accent)
  local timeout=m.power_timeout or 0
  label(168,timeout<0 and"息屏：常亮"or(timeout==0 and"息屏：跟随系统"or("息屏："..tostring(timeout).."秒")),0,C.sub)
- label(238,m.page=="home"and"○ 播放页  △ 搜索  SELECT 设置"or"○ 暂停  L/R 切歌  SELECT 菜单",0,C.sub)
+ label(238,m.page=="home"and ui.button_hint("○ 播放页  △ 搜索  SELECT 设置")or ui.button_hint("○ 暂停  L/R 切歌  SELECT 菜单"),0,C.sub)
 end
 return {pages={home=draw,player=draw},input=function(page,t,dt,m,k)
  if page~="home"then return false end

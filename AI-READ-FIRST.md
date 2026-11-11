@@ -85,6 +85,23 @@ flowchart LR
 6. 缓存索引在磁盘，元数据按窗口懒加载。`CACHE_MAX=64`是窗口大小，**不是歌曲总数上限**。
 7. 主线程管输入和页面；API线程管串行网络业务；下载线程管流和下载任务；音频解码与输出分线程。不要在绘制或按键处理里加入阻塞网络请求。
 
+## 输入法热路径（实机卡顿修复）
+
+扩展包prepare加载为高partition快照，ime_pack_read不读磁盘；按键与window查询应验证IO计数不增长。词库生命周期ime_suspend_dictionary/ime_resume_dictionary：MV前释放，非MV主循环resume无挂起时立即返回，失败只试一次。不要在键处理里重新prepare完整词库。
+main search_assoc_once按key/mode/revision去重；多音节选单字只消耗首音节。tests/test_ime_performance.py覆盖实际词包、窗口与零磁盘查询。
+
+## 单曲循环与极致列表快移
+
+`audio_replay_current`复制当前路径、检查完整源/MV所有权，再走stop→audio_play_file新gen。正常EOF不能用audio_seek复活已退出decoder，未知时长也不能跳过单曲循环。主循环END只调度一次，极致模式按play_mode==2保留同index。
+测试：`test_audio_repeat.py`、`test_repeat_dispatch.py`、`test_ultra_player.py`。极致列表左右快移8首，□才切分类，draw仍禁止元数据读盘。
+
+## 确认键映射（2026-11-11）
+
+设置ID30新增确认键，合计31项；`input_buttons.c/h`在输入采样入口把物理○/×转换成语义○确认/×取消。不要在各个input函数重复交换；Lua k.confirm/k.back仍语义位。系统Utility自行读取物理键，应用不改系统偏好。
+`buttons.cfg`保存-1跟随系统/0圆圈确认/1叉确认，启动读取SDK按钮偏好；切换当帧清输入边沿，不生成假按下。
+提示使用`input_buttons_hint`或Lua`ui.button_hint`只转换静态按键说明，不转换歌曲名/搜索词/歌词。模型暴露confirm_key/cancel_key/button_cross_confirm。
+主机验证入口`tests/test_input_buttons.py`；用户入口`README.md`；记录`WORKLOG.md`。
+
 ## 2026-11-11后续功能入口
 
 - 省电皮肤所有权/锁定：`power_runtime.c`、清单`power_profile`，ECO四配色；`docs/POWER-PROFILES.md`。

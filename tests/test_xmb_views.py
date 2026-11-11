@@ -13,6 +13,7 @@ local C={bg="bg",fg="fg",dim="dim",accent="accent",soft="soft",line="line"}
 local calls={}
 local function record(kind,...) calls[#calls+1]={kind,...} end
 local ui={}
+function ui.button_hint(s)return s end
 function ui.rect(x,y,w,h,c) assert(w>=0 and h>=0);record("rect",x,y,w,h,c) end
 function ui.cover(...) record("cover",...);return false end
 function ui.disc(...) record("disc",...) end

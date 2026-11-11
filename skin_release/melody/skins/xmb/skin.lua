@@ -86,7 +86,7 @@ local function bar(left,right)
  local compact={home="←→分类  ↑↓选择  ○进入  ×返回",player="○暂停/继续  L/R切歌  △歌词  SELECT菜单  ×返回",lyrics="○暂停  □译文  L/R切歌  ×返回",songs="○播放  L多选  □勾选  △下载  ×返回",search="○选择/打开  △搜索/编辑  L/R分类  ×返回",downloads="○暂停/继续  SELECT播放  △移除  ×返回",cache="○播放  ←→快移  ×返回",grid="↑↓选择  ○打开  ←→快移  ×返回",square="↑↓选择  ○打开  ←→快移  ×分类",settings="↑↓选择  ←→调整  ○确认  ×返回",mine="↑↓选择  ○打开  △播放  ×返回",account="○账号操作  ×返回"}
  local value=selectionFooter or compact[lastPage]or left or"○进入  ×返回"
  if(lastPage=="downloads"and transferFolder)or(lastPage=="cache"and offlineFolder)or(lastPage=="home"and currentFolder)then value="↑↓选择  ○打开文件夹  ←→快移  ×上一级"end
- text(18,254,446,value,0,C.fg)
+ text(18,254,446,ui.button_hint(value),0,C.fg)
 end
 local function row(y,label,value,selected)
  if selected then text(46,y+2,22,">",1)end
@@ -251,7 +251,7 @@ end
 local function xmbTransfers(t,m)
  local mv=m.download_tab==1;local rows=m.downloads or{};local selected=m.download_selected or 1
  header(mv and"下载 / MV"or"下载 / 歌曲",tostring(#rows).." 项 · 待解析 "..tostring(m.pending_downloads or 0),m)
- local states={[0]="等待中",[1]="下载中",[2]="已完成",[3]=mv and"未完成 · ○继续"or"失败",[4]="已暂停"}
+ local states={[0]="等待中",[1]="下载中",[2]="已完成",[3]=mv and ui.button_hint("未完成 · ○继续")or"失败",[4]="已暂停"}
  local first=math.max(1,selected-1);local shown=0
  for i,r in ipairs(rows)do if i>=first and shown<3 then local y=90+shown*44;local pct=math.max(0,math.min(100,r.percent or 0))
   if i==selected then text(24,y,18,">",0,C.accent)end
@@ -316,7 +316,7 @@ end
 local function account(t,m)
  header("账号",m.logged_in==1 and"网易云音乐"or"扫码登录",m)
  if m.logged_in==1 then text(21,89,430,m.login_name or"已登录",2);text(23,139,420,"音乐收藏与歌单已连接",0,C.dim);bar("△刷新  ○账号操作","× 返回")
- else text(22,85,210,"手机扫码登录",1);text(22,124,210,"打开网易云音乐扫一扫",0,C.dim);text(22,148,210,m.qr_state==802 and"已扫码，请在手机确认"or"○ 获取或刷新二维码",0,C.dim);if not ui.qr(277,69,160)then ui.rect(277,69,160,160,C.soft);text(289,131,136,"等待二维码",0,C.dim)end;bar("○生成 / 刷新二维码","× 返回")end
+ else text(22,85,210,"手机扫码登录",1);text(22,124,210,"打开网易云音乐扫一扫",0,C.dim);text(22,148,210,m.qr_state==802 and"已扫码，请在手机确认"or ui.button_hint("○ 获取或刷新二维码"),0,C.dim);if not ui.qr(277,69,160)then ui.rect(277,69,160,160,C.soft);text(289,131,136,"等待二维码",0,C.dim)end;bar("○生成 / 刷新二维码","× 返回")end
 end
 
 local categoryNames={"推荐","华语","流行","摇滚","电子","民谣","说唱","轻音乐","古典"}
@@ -373,7 +373,7 @@ function skin.draw(page,t,dt,m,k)
   if page=="cache"then if not contentIntent.cache then offlineFolder=true end;contentIntent.cache=nil end
   lastPage=page;repeatKey=0
  end
- selectionFooter=nil;if m.download_select_mode==1 and(page=="songs"or(page=="search"and(m.search_kind or 0)==0))then selectionFooter=selectionHint(m).."  ×返回"end
+ selectionFooter=nil;if m.download_select_mode==1 and(page=="songs"or(page=="search"and(m.search_kind or 0)==0))then selectionFooter=selectionHint(m)..ui.button_hint("  ×返回")end
  background(t);draw(t,m);return true
 end
 function skin.input(page,t,dt,m,k)

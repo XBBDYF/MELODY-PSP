@@ -1,3 +1,4 @@
+#include "input_buttons.h"
 #include "overclock_dialog.h"
 #include "overclock_bridge.h"
 #include "power_runtime.h"
@@ -60,8 +61,8 @@ void overclock_dialog_draw(void){
  snprintf(lines[3],96,"使用上游默认频率表：%s",confirmed_table?"是":"否");
  snprintf(lines[4],96,"opicker.id来自同机：%s（最大索引%d）",confirmed_device?"是":"否",max_index);
  snprintf(lines[5],96,"%s",overclock_bridge_owns_clock()?"请求解除外部控制（先操作插件）":"确认交接时钟控制（不执行超频）");
- snprintf(lines[6],96,"%s",overclock_bridge_owns_clock()?"我已手动解除插件超频，确认交回":"关闭此窗口：按 ×");
+ snprintf(lines[6],96,"%s",overclock_bridge_owns_clock()?"我已手动解除插件超频，确认交回":input_buttons_hint("关闭此窗口：按 ×"));
  for(int i=0;i<7;++i){int y=44+i*23;if(i==row)gfx_fill_rect(10,y-2,460,21,gfx_rgb(42,46,52));gfx_text_ellipsis(FS_SM,17,y,447,lines[i],i==row?accent:fg);}
  gfx_text_ellipsis(FS_SM,16,219,448,notice,accent);
- gfx_text(FS_SM,16,242,"↑↓选择  ←→调整  ○确认  ×关闭；省电皮肤禁止接管",dim);
+ gfx_text(FS_SM,16,242,input_buttons_hint("↑↓选择  ←→调整  ○确认  ×关闭；省电皮肤禁止接管"),dim);
 }

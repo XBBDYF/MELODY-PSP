@@ -33,7 +33,7 @@ local function home(t, m)
   end
 
   if (app.option("show_hint") or 0) == 1 then
-    text(20, 244, 440, "○ 播放   △ 搜索   □ 设置   × 返回", 0, C.dim)
+    text(20, 244, 440, ui.button_hint("○ 播放   △ 搜索   □ 设置   × 返回"), 0, C.dim)
   end
 end
 
@@ -51,7 +51,7 @@ local function search(t, m)
   ui.rect(12, 30, 456, 30, C.panel2)
   text(22, 38, 420, (m.query ~= nil and m.query ~= "") and m.query or "搜索歌曲、歌手", 1,
        ((m.query or "") ~= "") and C.text or C.dim)
-  text(20, 240, 440, "○ 上屏   △ 联想   □ 语言   ← 删除", 0, C.dim)
+  text(20, 240, 440, ui.button_hint("○ 上屏   △ 联想   □ 语言   ← 删除"), 0, C.dim)
 end
 
 local skin = {

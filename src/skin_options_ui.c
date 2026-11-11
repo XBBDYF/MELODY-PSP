@@ -1,3 +1,4 @@
+#include "input_buttons.h"
 #include "skin_options_ui.h"
 #include "power_runtime.h"
 #include "skin_options.h"
@@ -35,5 +36,5 @@ void skin_options_dialog_draw(void){
   else snprintf(value,sizeof(value),"%d",o->value);
   gfx_text_ellipsis(FS_MD,55,y,220,o->label,p.text);gfx_text_right(FS_MD,425,y,value,i==selected?p.accent:p.muted);
  }
- gfx_text(FS_SM,51,217,"↑↓选择  ←→/○调整并保存  ×关闭",p.muted);
+ gfx_text(FS_SM,51,217,input_buttons_hint("↑↓选择  ←→/○调整并保存  ×关闭"),p.muted);
 }

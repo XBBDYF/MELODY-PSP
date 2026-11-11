@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SHIM = r'''
 local calls,actions={},{}
 ui=setmetatable({}, {__index=function(_,key)return function(...)calls[#calls+1]={key,...};return false end end})
+ui.button_hint=function(s)return s end
 ui.text_width=function(s,font)local n=0;for _,cp in utf8.codes(s)do n=n+(cp<128 and 7 or 15)+(font==1 and 2 or 0)end;return n end
 app={option=function(_,v)return v end,dispatch=function(a)actions[#actions+1]=a end}
 local skin=(function() SOURCE end)()

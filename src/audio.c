@@ -927,7 +927,8 @@ static int decode_thread(SceSize args, void *argp)
                 if (stream_finished(my) && at_end) {
                     stage_flush();
                     g_dec_done = 1;
-                    set_state(AUDIO_END, "eof");
+                    /* PCM may still contain seconds of sound. Only the output
+                     * thread announces END after draining the ring. */
                     break;
                 }
                 sceKernelDelayThread(5 * 1000);
@@ -1636,6 +1637,21 @@ void audio_stop(void)
     g_state = AUDIO_IDLE;
     g_pause = 0;
     dl_stream_stop();
+}
+
+
+int audio_replay_current(const Song *meta)
+{
+    char path[sizeof(g_path)];
+    Song song;
+    if(g_audio_faulted||g_mv_held||g_mv_request||!g_path[0])return -1;
+    if(!g_local&&!dl_stream_done(g_gen))return -1;
+    /* audio_play_file writes g_path; never pass that same storage as its source. */
+    snprintf(path,sizeof(path),"%s",g_path);
+    if(meta)song=*meta;
+    else {memset(&song,0,sizeof(song));song.dur_ms=g_dur_ms;}
+    audio_stop();
+    return audio_play_file(path,&song);
 }
 
 void audio_pause(int on)

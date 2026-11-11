@@ -55,7 +55,7 @@ int main(void) {
     store_set_disc_player(-1); assert(store_disc_player() == 0);
     store_set_disc_player(1); remove("data.txt"); store_init(); assert(store_disc_player() == 0);
     int seen[MELODY_SETTINGS_COUNT] = {0};
-    assert(MELODY_SETTINGS_COUNT == 30);
+    assert(MELODY_SETTINGS_COUNT == 31);
     for (int row=0; row<MELODY_SETTINGS_COUNT; ++row) {
         int id=melody_setting_id(row); assert(id>=0 && id<MELODY_SETTINGS_COUNT); assert(!seen[id]++);
         if(id==3) assert(melody_setting_id(row+1)==22);

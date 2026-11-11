@@ -6,6 +6,7 @@
 #include "ime_font_data.h"
 #ifdef __PSP__
 #include <pspiofilemgr.h>
+#include <pspsysmem.h>
 #endif
 #ifdef _WIN32
 #include <windows.h>
@@ -19,12 +20,15 @@ typedef SceUID PackFile;
 typedef FILE *PackFile;
 #define PACK_INVALID NULL
 #endif
-#define PACK_PAGE_RECORDS 51u
-#define PACK_PAGE_BYTES (PACK_PAGE_RECORDS * IME_PACK_RECORD_SIZE)
 struct ImePack {
  PackFile file;
- uint32_t counts[3], starts[3], revision, total, page_first, page_count;
- unsigned char page[PACK_PAGE_BYTES];
+ unsigned char *snapshot;
+ char path[512];
+ unsigned int io_reads, record_reads;
+#ifdef __PSP__
+ SceUID block;
+#endif
+ uint32_t counts[3], starts[3], revision, total;
 };
 static uint32_t le32(const unsigned char *p) { return (uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24); }
 static uint32_t crc_step(uint32_t crc,const unsigned char *p,size_t n) {
@@ -99,21 +103,9 @@ static void file_remove(const char *path) {
 #endif
 }
 static int raw_record(ImePack *p,uint32_t index,unsigned char out[80]) {
- if(index>=p->total)return IME_PACK_BOUNDS;
- if(!p->page_count||index<p->page_first||index>=p->page_first+p->page_count) {
-  uint32_t first=index/PACK_PAGE_RECORDS*PACK_PAGE_RECORDS;
-  uint32_t count=p->total-first;if(count>PACK_PAGE_RECORDS)count=PACK_PAGE_RECORDS;
-  p->page_count=0;
-  if(file_seek(p->file,(long)(64+first*80),SEEK_SET)<0)return IME_PACK_IO;
-  unsigned int bytes=count*80,done=0;
-  while(done<bytes) {
-   int n=file_read(p->file,p->page+done,bytes-done);
-   if(n<=0)return IME_PACK_IO;
-   done+=(unsigned int)n;
-  }
-  p->page_first=first;p->page_count=count;
- }
- memcpy(out,p->page+(index-p->page_first)*80,80);return 0;
+ if(index>=p->total||!p->snapshot)return IME_PACK_BOUNDS;
+ p->record_reads++;
+ memcpy(out,p->snapshot+index*80,80);return 0;
 }
 static int font_has(unsigned int cp) {
  unsigned int a=0,b=(unsigned int)(sizeof(k_ime_font_cps)/sizeof(k_ime_font_cps[0]));
@@ -170,6 +162,27 @@ int ime_pack_prepare(const char *path,ImePack **out) {
  if(file_seek(f,0,SEEK_END)!=(long)(64+n*80)) goto fail;
  p=(ImePack*)calloc(1,sizeof(*p));err=IME_PACK_MEMORY;if(!p)goto fail;
  p->file=f;p->total=n;
+#ifdef __PSP__
+ p->block=-1;
+#endif
+ if(strlen(path)>=sizeof(p->path)) { err=IME_PACK_BOUNDS;goto fail; }
+ strcpy(p->path,path);
+#ifdef __PSP__
+ if(sceKernelMaxFreeMemSize()<n*80u+1024u*1024u) { err=IME_PACK_MEMORY;goto fail; }
+ p->block=sceKernelAllocPartitionMemory(2,"ime_snapshot",PSP_SMEM_High,n*80u,NULL);
+ if(p->block>=0)p->snapshot=(unsigned char*)sceKernelGetBlockHeadAddr(p->block);
+#else
+ p->snapshot=(unsigned char*)malloc(n*80u);
+#endif
+ if(!p->snapshot) { err=IME_PACK_MEMORY;goto fail; }
+ if(file_seek(f,64,SEEK_SET)<0) { err=IME_PACK_IO;goto fail; }
+ for(unsigned int done=0;done<n*80u;) {
+  unsigned int bytes=n*80u-done;if(bytes>32768u)bytes=32768u;
+  p->io_reads++;int got=file_read(f,p->snapshot+done,bytes);
+  if(got<=0) { err=IME_PACK_IO;goto fail; }
+  done+=(unsigned int)got;
+ }
+
  memset(&prev,0,sizeof(prev));
  for(uint32_t i=0;i<n;i++) {
   err=raw_record(p,i,b);if(err)goto fail;
@@ -181,10 +194,22 @@ int ime_pack_prepare(const char *path,ImePack **out) {
  err=IME_PACK_CRC; if((crc^~0u)!=le32(h+20)) goto fail;
  err=IME_PACK_FORMAT_ERROR; for(int i=0;i<3;i++) if(counts[i]!=le32(h+28+i*4)) goto fail;
  p->file=f; memcpy(p->counts,counts,sizeof(counts)); p->starts[1]=counts[0];p->starts[2]=counts[0]+counts[1];p->revision=le32(h+44);
+ file_close(f);p->file=PACK_INVALID;
  *out=p; return 0;
-fail: file_close(f);free(p);return err;
+fail: if(p)ime_pack_close(p);else file_close(f);return err;
 }
-void ime_pack_close(ImePack *p) { if(p) { file_close(p->file); free(p); } }
+void ime_pack_close(ImePack *p) { if(p) {
+ if(p->file!=PACK_INVALID)file_close(p->file);
+#ifdef __PSP__
+ if(p->block>=0)sceKernelFreePartitionMemory(p->block);
+#else
+ free(p->snapshot);
+#endif
+ free(p);
+} }
+const char *ime_pack_path(const ImePack *p) { return p?p->path:""; }
+unsigned int ime_pack_io_reads(const ImePack *p) { return p?p->io_reads:0; }
+unsigned int ime_pack_record_reads(const ImePack *p) { return p?p->record_reads:0; }
 int ime_pack_validate(const char *path) { ImePack *p=NULL; int r=ime_pack_prepare(path,&p); ime_pack_close(p); return r; }
 unsigned int ime_pack_count(const ImePack *p,int kind) { return p&&kind>=0&&kind<3?p->counts[kind]:0; }
 unsigned int ime_pack_revision(const ImePack *p) { return p?p->revision:0; }
@@ -192,7 +217,7 @@ int ime_pack_read(ImePack *p,int kind,unsigned int index,ImePackEntry *out) {
  unsigned char b[80]; if(!p||!out||kind<0||kind>2||index>=p->counts[kind]) return IME_PACK_BOUNDS;
  int r=raw_record(p,p->starts[kind]+index,b);if(r)return r;
  /* The activated inode is immutable. Recheck record boundaries on read nevertheless. */
- return decode(b,out);
+ memcpy(out->key,b,48);memcpy(out->word,b+48,24);out->freq=le32(b+72);out->kind=le32(b+76);return 0;
 }
 int ime_pack_install(const char *source,const char *current) {
  char temp[512];unsigned char b[4096];int n,err;

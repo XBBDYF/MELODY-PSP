@@ -1,3 +1,5 @@
+> 确认键适配更新：见[13-CONFIRM-BUTTONS.md](13-CONFIRM-BUTTONS.md)，默认跟随系统，○/×提示只转换一次。
+
 > 2026-11-11后续：省电皮肤`power_profile`将锁定全局性能选项；ECO支持配色，极致模式本地/缓存与歌词/封面开关。见[09-POWER-PROFILES.md](09-POWER-PROFILES.md)。独立词库见[10-IME-PACK.md](10-IME-PACK.md)。
 
 # MELODY 主题制作包（THEME-KIT）
@@ -114,3 +116,5 @@ python -B TOOLS/make_theme_font.py myfont.ttf --size 22 --chars "常用字" -o s
 - `schema` 目前只有 `1`；
 - `min_app_version` 填你验证过的最低版本（例如 `"4.1.1"`），旧版程序看到更高版本会提示但仍可尝试加载；
 - 新增能力（`fonts`、`preferences`、`optional_capabilities`）在旧程序上是**忽略**而不是报错，所以可以安全带上。
+
+ECO配色已同步Lua页、原生回退和状态栏。MV启动时回收首页图片缓存，新增主题不要把大像素缓冲常驻不可释放区。

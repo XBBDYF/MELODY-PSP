@@ -44,6 +44,7 @@
 #include "ime_update.h"
 #include "overclock_dialog.h"
 #include "platform_plugins.h"
+#include "input_buttons.h"
 #include "ime.h"
 #include "search_history.h"
 #include "search_chips.h"
@@ -73,6 +74,7 @@ static const char *cat_names[8] = { "华语", "流行", "摇滚", "电子", "民
 
 static SceInt64 g_start_us;
 static unsigned int g_prev_btn;
+static int g_buttons_changed;
 static unsigned int g_pending_press;   /* 绘制期间按下、还没处理过的键 */
 static int g_update_applied;           /* 启动时换上了 EBOOT.NEW，提示再进一次 */
 static int g_exit_confirm;
@@ -1490,6 +1492,7 @@ static int mv_try_start(void)
         return 1;
     }
     g_mv_pending = 0;
+    ime_suspend_dictionary();
     power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
     if (mv_start(g_app.now.mv, path, g_app.now.name) == 0) {
         g_app.menu_open = 0;
@@ -1554,6 +1557,7 @@ static void mv_pending_tick(void)
         g_mv_from = g_app.screen;
         audio_pause(1);
     }
+    ime_suspend_dictionary();
     power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
     if ((streaming ? mv_start_stream(path, g_app.now.name) :
                      mv_start(id, path, g_app.now.name)) == 0) {
@@ -1821,10 +1825,20 @@ static void search_refresh_chips(void)
     if (g_app.chip_sel >= g_app.chips_n) g_app.chip_sel = 0;
 }
 
+/* Avoid rebuilding the same word prefix twice for one physical key/commit. */
+static void search_assoc_once(const char *key)
+{
+    static char last[IME_PRE_MAX];static unsigned revision=~0u;static int mode=-1;
+    unsigned current=ime_dictionary_revision();
+    if(current==revision&&mode==ime_mode()&&!strcmp(last,key))return;
+    g_app.assoc_n=ime_assoc(key,g_app.assoc,APP_ASSOC_MAX);
+    snprintf(last,sizeof(last),"%s",key);revision=current;mode=ime_mode();
+}
+
 static void search_refresh_local(void)
 {
     const char *key=ime_active()?ime_preedit():g_app.query;
-    g_app.assoc_n=ime_assoc(key,g_app.assoc,APP_ASSOC_MAX);
+    search_assoc_once(key);
     g_app.chip_sel=0;g_app.chip_off=0;
     g_app.ime_sel=0;g_app.ime_off=0;
 }
@@ -1857,7 +1871,7 @@ static void query_backspace(void)
 /* 上屏后立即刷新联想：本地词库补全 + 在线联想（提示词也算） */
 static void search_after_commit(void)
 {
-    g_app.assoc_n = ime_assoc(g_app.query, g_app.assoc, APP_ASSOC_MAX);
+    search_assoc_once(ime_active()?ime_preedit():g_app.query);
     g_app.chip_sel = 0;
     if (g_app.query[0]) {
         snprintf(g_app.sug_last, sizeof(g_app.sug_last), "%s", g_app.query);
@@ -1871,7 +1885,6 @@ static void search_type_char(char ch)
 {
     static char last_pre[24];
     int r = ime_feed(ch);
-    search_refresh_local();
 
     if (r == 2) {
         char s[2] = { ch, 0 };
@@ -1879,7 +1892,7 @@ static void search_type_char(char ch)
         query_append(s);
     } else if (r == 1) {
         query_append(ime_last_commit());
-    }
+    } else search_refresh_local();
     if (ime_active() && ime_candidate_count() == 0 && strcmp(last_pre, ime_preedit())) {
         snprintf(last_pre, sizeof(last_pre), "%s", ime_preedit());
         mlog("ime: no candidate for [%s] mode=%d", ime_preedit(), ime_mode());
@@ -2599,7 +2612,8 @@ static void input_download(unsigned int pressed, unsigned int held, float dt)
                     g_mv_from = SC_DOWNLOAD;
                     audio_pause(1);
                     if(mvx_active()){ui_toast("MV导出中，请稍后播放");return;}
-                    power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
+                    ime_suspend_dictionary();
+    power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
                     if (mv_start(items[g_app.dl_sel].mvid, items[g_app.dl_sel].path,
                                  items[g_app.dl_sel].name) == 0) {
                         g_app.dl_tab = 0;
@@ -2840,6 +2854,14 @@ static void input_settings(unsigned int pressed, unsigned int held, float dt)
         return;
     }
     if(setting==3&&(pressed&(PSP_CTRL_CIRCLE|PSP_CTRL_LEFT|PSP_CTRL_RIGHT))){open_skin_center();return;}
+    if(setting==30&&(pressed&(PSP_CTRL_LEFT|PSP_CTRL_RIGHT|PSP_CTRL_CIRCLE))){
+        int old=input_buttons_mode();
+        int next=((old+1+((pressed&PSP_CTRL_LEFT)?2:1))%3)-1;
+        if(input_buttons_set_mode(next)<0)ui_toast("确认键设置保存失败，保留原设置");
+        else {ui_toast(input_buttons_cross_confirm()?"确认：×  取消：○":"确认：○  取消：×");
+          SceCtrlData current={0};sceCtrlPeekBufferPositive(&current,1);g_prev_btn=input_buttons_translate(current.Buttons);g_pending_press=0;g_buttons_changed=1;}
+        return;
+    }
     if(setting==29&&(pressed&PSP_CTRL_CIRCLE)){overclock_dialog_open();return;}
     if(setting==28&&(pressed&PSP_CTRL_CIRCLE)){
         if(ime_update_start()<0)ui_toast("词库更新正忙或当前禁止联网");
@@ -3425,7 +3447,8 @@ static void auto_test(float dt)
             stage=1;g_test_t=0;
             if(!url[0]||mv_stream_start(url,APP_DIR "cache/mv_990000003_240.mp4")<0){mlog("TEST62 source-start failed");stage=4;}
         }else if(stage==1&&mv_stream_total()>0&&mv_stream_available()>=mv_stream_prefetch()){
-            power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
+            ime_suspend_dictionary();
+    power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
             int result=mv_start_stream(APP_DIR "cache/mv_990000003_240.mp4","Software HTTP Test");
             mlog("TEST62 start result=%d available=%lld total=%lld",result,mv_stream_available(),mv_stream_total());
             if(!result){set_screen(SC_MV);stage=2;g_test_t=0;}else stage=4;
@@ -4084,7 +4107,7 @@ static int privacy_gate(void){
     if(community_privacy_accepted())return 1;
     mlog("privacy gate ready: network not initialized");log_flush();
     unsigned previous=0;int scroll=0;
-    while(!g_exit_req){SceCtrlData pad={0};sceCtrlReadBufferPositive(&pad,1);unsigned held=pad.Buttons;
+    while(!g_exit_req){SceCtrlData pad={0};sceCtrlReadBufferPositive(&pad,1);unsigned held=input_buttons_translate(pad.Buttons);
         if(pad.Ly<70)held|=PSP_CTRL_UP;else if(pad.Ly>186)held|=PSP_CTRL_DOWN;
         unsigned pressed=held&~previous;previous=held;
         if(pressed&PSP_CTRL_UP){if(scroll>0)--scroll;}
@@ -4109,6 +4132,7 @@ int app_main(void)
 
     gfx_init();
     log_open();
+    input_buttons_init();
     power_runtime_init();
     platform_plugins_probe();
     mlog("MELODY PSP %s start %s %s", APP_VER, __DATE__, __TIME__);
@@ -4181,7 +4205,7 @@ int app_main(void)
     {
         SceCtrlData pad0;
 
-        if (sceCtrlPeekBufferPositive(&pad0, 1) > 0) g_prev_btn = pad0.Buttons;
+        if (sceCtrlPeekBufferPositive(&pad0, 1) > 0) g_prev_btn = input_buttons_translate(pad0.Buttons);
     }
 
     ultra_player_init();
@@ -4209,7 +4233,7 @@ int app_main(void)
         g_app.spinner += dt * 2.0f;
 
         sceCtrlPeekBufferPositive(&pad, 1);
-        held = pad.Buttons;
+        held = input_buttons_translate(pad.Buttons);
         /* Analogue dead zone; use the existing directional repeat/navigation. */
         if(pad.Lx<70)held|=PSP_CTRL_LEFT;else if(pad.Lx>186)held|=PSP_CTRL_RIGHT;
         if(pad.Ly<70)held|=PSP_CTRL_UP;else if(pad.Ly>186)held|=PSP_CTRL_DOWN;
@@ -4236,7 +4260,7 @@ int app_main(void)
             if(power_runtime_ultra()){
                 if(!ultra_entered){
                     ultra_entered=1;
-                    ime_update_cancel();net_set_offline(1);
+                    ime_update_cancel();ime_suspend_dictionary();net_set_offline(1);
                     api_cancel_pending_prefetch();api_clear_pending_downloads();
                     for(int i=0;i<dl_queue_count();++i)dl_queue_pause(i);
                     skin_transition_reset();
@@ -4283,6 +4307,7 @@ int app_main(void)
                 continue;
             }
         }
+        if(!mv_active()&&!mv_finished()&&!g_mv_connecting&&!g_mv_ui_retained)ime_resume_dictionary();
         ime_update_poll();
         pump_events();
 
@@ -4345,14 +4370,16 @@ int app_main(void)
             if (!g_end_done) {
                 g_end_done = 1;
                 g_app.paused = 1;
-                if (dur > 0 && audio_pos_ms() > dur - 3000) {
-                    if (g_app.play_mode == 2) {
-                        audio_seek(0);
-                        audio_pause(0);
-                        g_app.paused = 0;
-                    } else {
-                        preserve_play_page=1;play_next(1);preserve_play_page=0;
+                if (g_app.play_mode == 2) {
+                    /* END means the decoder may already have exited. A seek
+                     * cannot restart it, and local durations may be unknown. */
+                    if(audio_replay_current(&g_app.now)>0)g_app.paused=0;
+                    else {
+                        api_request_play(g_app.playing_index,&g_app.now);
+                        ui_toast("单曲循环：正在重新打开当前歌曲");
                     }
+                } else if(dur > 0 && audio_pos_ms() > dur - 3000) {
+                    preserve_play_page=1;play_next(1);preserve_play_page=0;
                 }
                 mlog("auto next (end of song) pos=%d dur=%d ctx=%d/%d src=%d", (int)audio_pos_ms(),
                      dur, g_playback.index, g_playback.count, g_playback.source);
@@ -4508,7 +4535,8 @@ int app_main(void)
                         SceIoStat st;
 
                         if (sceIoGetstat(path, &st) >= 0) {
-                            power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
+                            ime_suspend_dictionary();
+    power_runtime_tick((unsigned)(sceKernelGetSystemTimeWide()/1000),0,1,1,1);
                             if (mv_start(mv, path, g_list.songs[i].name) == 0) {
                                 mlog("TEST mv play mvid=%d path=%s", mv, path);
                                 set_screen(SC_MV);
@@ -4866,8 +4894,10 @@ int app_main(void)
         {
             SceCtrlData pad2;
 
-            if (sceCtrlPeekBufferPositive(&pad2, 1) > 0)
-                g_pending_press |= (pad2.Buttons & ~sampled_held);
+            if (sceCtrlPeekBufferPositive(&pad2, 1) > 0){
+                if(g_buttons_changed){g_prev_btn=input_buttons_translate(pad2.Buttons);g_pending_press=0;g_buttons_changed=0;}
+                else g_pending_press |= (input_buttons_translate(pad2.Buttons) & ~sampled_held);
+            }
         }
 
         if (g_frame < 4) mlog("frame %d drawn", g_frame);

@@ -49,8 +49,7 @@ static const char *paths[3]={"ms0:/MUSIC/a.mp3","ms0:/MUSIC/b.mp3","ms0:/MUSIC/c
 static int state=AUDIO_PLAY,g_end_done,seek_count;
 static int audio_state(void){return state;}
 static int audio_pos_ms(void){return 1000;}
-static void audio_seek(int position){assert(position==0);seek_count++;state=AUDIO_PLAY;}
-static void audio_pause(int paused){(void)paused;}
+static int audio_replay_current(const Song *song){assert(song==&g_app.now);seek_count++;state=AUDIO_PLAY;return 1;}
 static int store_prefetch_count(void){return 5;}
 static int dl_has_song(long long id){(void)id;return 0;}
 static int api_download_pending(long long id){(void)id;return 0;}
@@ -119,5 +118,5 @@ subprocess.run(['D:/msys64/ucrt64/bin/gcc.exe','-std=c11','-Wall','-Wextra','-We
 subprocess.run([str(exe)],cwd=O,check=True)
 # EOF must continue sharing the manual next context; loop-one remains an audio replay.
 eof=s[s.index('if (audio_state() == AUDIO_END'):s.index('if (audio_state() == AUDIO_ERROR',s.index('if (audio_state() == AUDIO_END'))]
-assert 'play_next(1)' in eof and 'audio_seek(0)' in eof
+assert 'play_next(1)' in eof and 'audio_replay_current(&g_app.now)' in eof and 'audio_seek(0)' not in eof
 print('PASS EOF shared next path and loop-one replay retained')

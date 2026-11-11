@@ -1,3 +1,4 @@
+#include "input_buttons.h"
 /* Fixed-memory local MP3 player. No API/cache/skin runtime dependencies. */
 #include "ultra_player.h"
 #include "app.h"
@@ -216,16 +217,23 @@ int ultra_player_tick(unsigned int pressed, unsigned int held, float dt)
     if(u.options){
       if(pressed&PSP_CTRL_CROSS){u.options=0;return 0;}
       if((pressed&PSP_CTRL_UP)&&u.option_row>0)--u.option_row;
-      if((pressed&PSP_CTRL_DOWN)&&u.option_row<2)++u.option_row;
+      if((pressed&PSP_CTRL_DOWN)&&u.option_row<3)++u.option_row;
       if(pressed&(PSP_CTRL_CIRCLE|PSP_CTRL_LEFT|PSP_CTRL_RIGHT)){
         if(!u.option_row)u.lyrics_on=!u.lyrics_on;
         else if(u.option_row==1){u.cover_on=!u.cover_on;const char*path=u.tab?"":(u.playing>=0?local_path_of(u.playing):"");load_cover(path?path:"");}
-        else {static const int clocks[]={133,100,80,66};u.clock_index=(u.clock_index+1)%4;power_runtime_set_ultra_clock(clocks[u.clock_index]);}
+        else if(u.option_row==2){static const int clocks[]={133,100,80,66};u.clock_index=(u.clock_index+1)%4;power_runtime_set_ultra_clock(clocks[u.clock_index]);}
+        else g_app.play_mode=g_app.play_mode==2?0:2;
       }
       return 0;
     }
-    if(u.page==PAGE_LIST&&(pressed&(PSP_CTRL_SQUARE|PSP_CTRL_LEFT|PSP_CTRL_RIGHT))){u.tab=!u.tab;if(u.tab&&!u.cache_loaded)scan_cache();u.selected=0;u.count=u.tab?u.cache_count:local_count();return 0;}
+    if(u.page==PAGE_LIST&&(pressed&(PSP_CTRL_SQUARE))){u.tab=!u.tab;if(u.tab&&!u.cache_loaded)scan_cache();u.selected=0;u.count=u.tab?u.cache_count:local_count();return 0;}
 
+    if(u.page==PAGE_LIST&&(pressed&(PSP_CTRL_LEFT|PSP_CTRL_RIGHT))){
+        int target=u.selected+((pressed&PSP_CTRL_RIGHT)?8:-8);
+        if(target<0)target=0;
+        if(target>=u.count)target=u.count>0?u.count-1:0;
+        u.selected=target;g_app.local_sel=target;return 0;
+    }
     (void)held;
     (void)dt;
     if (pressed & PSP_CTRL_SELECT) { page(PAGE_SETTINGS); return 0; }
@@ -269,7 +277,7 @@ int ultra_player_tick(unsigned int pressed, unsigned int held, float dt)
     } else if (u.armed && state == AUDIO_END) {
         u.armed = 0;
         if(u.playing_tab!=u.tab){u.tab=u.playing_tab;u.count=u.playing_count;}
-        if (u.count > 0) play(u.playing + 1 < u.count ? u.playing + 1 : 0);
+        if (u.count > 0) play(g_app.play_mode==2?u.playing:(u.playing + 1 < u.count ? u.playing + 1 : 0));
     }
     return 0;
 }
@@ -289,11 +297,12 @@ void ultra_player_draw(void)
         snprintf(opt,sizeof(opt),"%s歌词：%s",u.option_row==0?"> ":"  ",u.lyrics_on?"开":"关");text(90,opt,u.option_row==0);
         snprintf(opt,sizeof(opt),"%s离线封面：%s",u.option_row==1?"> ":"  ",u.cover_on?"开":"关");text(120,opt,u.option_row==1);
         static const int clocks[]={133,100,80,66};snprintf(opt,sizeof(opt),"%sCPU目标：%dMHz（低频稳定性待实机验证）",u.option_row==2?"> ":"  ",clocks[u.clock_index]);text(150,opt,u.option_row==2);
-        text(240,"↑↓ 选择  ○调整  START/× 返回",0);return;
+        snprintf(opt,sizeof(opt),"%s播放模式：%s",u.option_row==3?"> ":"  ",g_app.play_mode==2?"单曲循环":"列表循环");text(180,opt,u.option_row==3);
+        text(240,input_buttons_hint("↑↓ 选择  ○调整  START/× 返回"),0);return;
     }
     if (u.page == PAGE_SETTINGS) {
         text(72, "> 退出当前省电皮肤", 1);
-        text(232, "○ 确认退出    × 本地列表", 0);
+        text(232, input_buttons_hint("○ 确认退出    × 本地列表"), 0);
         return;
     }
     if (u.page == PAGE_LIST) {
@@ -304,12 +313,12 @@ void ultra_player_draw(void)
             if (i == u.selected) gfx_fill_rect(10, 65 + (i-first)*22, 460, 21, 0x2104);
             text(66 + (i-first)*22,u.tab?u.cache_names[i]:local_name(i),i==u.selected);
         }
-        text(246, "↑↓选歌 ○播放 □本地/缓存 START选项 SELECT退出", 0);
+        text(246, input_buttons_hint("↑↓选歌 ←→快移8首 ○播放 □分类 START选项"), 0);
         return;
     }
     text(48, g_app.has_now ? g_app.now.name : "尚未播放", 1);
     if (u.error || audio_state() == AUDIO_ERROR) {
-        text(86, "播放失败：○ 重试，L/R 切换本地歌曲", 1);
+        text(86, input_buttons_hint("播放失败：○ 重试，L/R 切换本地歌曲"), 1);
         text(110, audio_error(), 0);
     } else if (u.page == PAGE_LYRICS && u.lyrics_on) {
         int current = -1, pos = audio_pos_ms();
@@ -331,8 +340,8 @@ void ultra_player_draw(void)
         text(112, status, 1);
     }
     if(u.cover_on&&u.cover_w>0&&u.page!=PAGE_LYRICS)gfx_blit_rgba_scaled(365,65,96,96,u.cover_rgba,u.cover_w,u.cover_h,255);
-    text(222, "○ 播放/暂停  ↑↓ 音量  L/R 上/下一首", 0);
-    text(246, "△ 歌词 ×列表 START歌词/封面/CPU SELECT退出", 0);
+    text(222, input_buttons_hint("○ 播放/暂停  ↑↓ 音量  L/R 上/下一首"), 0);
+    text(246, input_buttons_hint("△ 歌词 ×列表 START歌词/封面/CPU SELECT退出"), 0);
 }
 
 int ultra_player_needs_ui_clock(void){

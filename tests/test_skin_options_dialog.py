@@ -5,6 +5,7 @@ R=Path(__file__).resolve().parents[1];O=R/'.tmp/skin-options-dialog';O.mkdir(exi
 (O/'pspctrl.h').write_text('#define PSP_CTRL_UP 1\n#define PSP_CTRL_DOWN 2\n#define PSP_CTRL_LEFT 4\n#define PSP_CTRL_RIGHT 8\n#define PSP_CTRL_CIRCLE 16\n#define PSP_CTRL_CROSS 32\n')
 code=r'''
 #include <assert.h>
+const char *input_buttons_hint(const char *s){return s;}
 #include <stdio.h>
 #include <string.h>
 #include "skin_options.h"

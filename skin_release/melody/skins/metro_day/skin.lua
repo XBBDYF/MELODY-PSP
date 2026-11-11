@@ -82,7 +82,7 @@ local function header(title,sub,m)
  text(15,22,445,title,2);if sub then text(20,53,438,sub,0,C.dim)end
 end
 local extraHints={home="△回歌曲详情 · SELECT设置 · L/R分类",player="SELECT菜单  □喜欢  ↑↓音量  ×列表",lyrics="←→进度  ↑↓音量  △返回播放器",search="L/R搜索分类 · SELECT多选下载 · ←→快移",settings="△账号与登录 · SELECT+L皮肤中心",mine="△回歌曲详情 · SELECT+L皮肤中心",downloads="进度来自下载队列 · SELECT+L皮肤中心",cache="缓存/本地分别选曲 · SELECT+L皮肤中心",grid="封面加载后显示 · SELECT+L皮肤中心",square="封面加载后显示 · SELECT+L皮肤中心"}
-local function bar(left,right)ui.rect(0,236,480,36,C.soft);text(16,239,325,left,0,C.dim);text(354,239,110,right or"",0,C.dim);text(16,255,448,(lastPage=="player"and playerMode and playerMode~=0)and"SELECT菜单  □译文  ↑↓音量  ×列表"or extraHints[lastPage]or"SELECT+L皮肤中心",0,C.dim)end
+local function bar(left,right)ui.rect(0,236,480,36,C.soft);text(16,239,325,ui.button_hint(left),0,C.dim);text(354,239,110,ui.button_hint(right or""),0,C.dim);text(16,255,448,ui.button_hint((lastPage=="player"and playerMode and playerMode~=0)and"SELECT菜单  □译文  ↑↓音量  ×列表"or extraHints[lastPage]or"SELECT+L皮肤中心"),0,C.dim)end
 local function row(y,label,value,selected,tag)
  if selected then ui.rect(15,y+2,3,27,C.accent)end;text(26,y+1,tag and 386 or 420,label,1,selected and C.accent or C.fg)
  if tag then text(438,y+1,44,tag,0,C.accent)end
@@ -146,11 +146,11 @@ local function tileFace(b,i,t,m)
   if b.live=="discover"or b.live=="daily"then title=face.title or b.name end
   ui.overlay(b.x,y+h-29,b.w,29,"#000000",175);text(b.x+10,y+h-24,b.w-20,title,0,"#FFFFFF");return end
  if back then
-  if b.live=="daily"then text(b.x+12,y+13,b.w-24,"为今天挑选的新声音",1);text(b.x+12,y+43,b.w-24,m.logged_in==1 and"专属每日推荐"or"登录后获取你的每日推荐",0);text(b.x+12,y+h-24,b.w-24,"○ 打开 · 每日更新",0)
+  if b.live=="daily"then text(b.x+12,y+13,b.w-24,"为今天挑选的新声音",1);text(b.x+12,y+43,b.w-24,m.logged_in==1 and"专属每日推荐"or"登录后获取你的每日推荐",0);text(b.x+12,y+h-24,b.w-24,ui.button_hint("○ 打开 · 每日更新"),0)
   elseif b.live=="favorites"then text(b.x+12,y+15,b.w-24,tostring(m.favorite_count or 0).." 首本机收藏",1);text(b.x+12,y+46,b.w-24,m.logged_in==1 and"云端喜欢已连接"or"登录后同步云端喜欢",0)
   elseif b.live=="music"then
-   if b.h<70 then text(b.x+12,y+8,b.w-24,m.song~=""and m.song or"音乐，随身而行",0);text(b.x+12,y+28,b.w-24,m.artist~=""and m.artist or"○ 打开播放器",0)
-   else text(b.x+12,y+12,b.w-24,m.song~=""and m.song or"音乐，随身而行",1);text(b.x+12,y+38,b.w-24,m.artist~=""and m.artist or"打开歌曲，发现下一首",0);text(b.x+12,y+h-24,b.w-24,m.song~=""and(m.paused==1 and"已暂停"or"正在播放")or"○ 打开播放器",0)end
+   if b.h<70 then text(b.x+12,y+8,b.w-24,m.song~=""and m.song or"音乐，随身而行",0);text(b.x+12,y+28,b.w-24,m.artist~=""and m.artist or ui.button_hint("○ 打开播放器"),0)
+   else text(b.x+12,y+12,b.w-24,m.song~=""and m.song or"音乐，随身而行",1);text(b.x+12,y+38,b.w-24,m.artist~=""and m.artist or"打开歌曲，发现下一首",0);text(b.x+12,y+h-24,b.w-24,m.song~=""and(m.paused==1 and"已暂停"or"正在播放")or ui.button_hint("○ 打开播放器"),0)end
   elseif b.live=="library"then text(b.x+10,y+10,b.w-20,tostring(m.cache_count or 0),3);text(b.x+10,y+55,b.w-20,"首已缓存",0);text(b.x+10,y+78,b.w-20,tostring(m.local_count or 0).." 首本地",0)
   elseif b.live=="search"then text(b.x+10,y+12,b.w-20,m.query~=""and m.query or"想听什么？",1);text(b.x+10,y+56,b.w-20,m.online==1 and"在线搜索"or"连接后搜索",0);text(b.x+10,y+78,b.w-20,"歌曲 · 歌手",0)
   elseif b.live=="discover"then text(b.x+12,y+8,b.w-24,"歌单 / 排行榜 / 新声音",0);text(b.x+12,y+28,b.w-24,"发现下一首喜欢的歌",0)
@@ -301,7 +301,7 @@ local function downloads(t,m)
  text(200,59,263,tostring(#(m.downloads or{})).." 项  待解析 "..tostring(m.pending_downloads or 0),0,C.dim)
  if #(m.downloads or{})==0 then icon("download",211,112,42);text(45,185,390,"暂无任务 · 歌曲列表△加入后台下载",0,C.dim)
  else local first=math.max(1,(m.download_selected or 1)-2);local shown=0;for i,r in ipairs(m.downloads or{})do if i>=first and shown<3 then local y=86+shown*45;shown=shown+1;if i==m.download_selected then ui.rect(15,y,3,34,C.accent)end
-  text(23,y,373,r.name,1);text(415,y,46,tostring(r.percent).."%",0,C.accent);local state=m.download_tab==0 and(r.state==4 and"已暂停 · "or r.state==1 and"下载中 · "or"等待 · ")or(r.state==3 and"未完成 · ○继续 · "or r.state==2 and"已完成 · "or"下载中 · ");text(23,y+21,373,state..sizeText(r.bytes).." / "..sizeText(r.total_bytes),0,C.dim);ui.rect(23,y+36,435,2,C.line);ui.rect(23,y+36,435*r.percent/100,2,C.accent)
+  text(23,y,373,r.name,1);text(415,y,46,tostring(r.percent).."%",0,C.accent);local state=m.download_tab==0 and(r.state==4 and"已暂停 · "or r.state==1 and"下载中 · "or"等待 · ")or(r.state==3 and ui.button_hint("未完成 · ○继续 · ")or r.state==2 and"已完成 · "or"下载中 · ");text(23,y+21,373,state..sizeText(r.bytes).." / "..sizeText(r.total_bytes),0,C.dim);ui.rect(23,y+36,435,2,C.line);ui.rect(23,y+36,435*r.percent/100,2,C.accent)
  end end end
  bar(m.download_tab==0 and"○暂停/继续  SELECT播放  △移除"or"○播放/继续  □导出  △删除","L/R分类  ×返回")
 end
@@ -354,7 +354,7 @@ end
 local function account(t,m)
  header("账号",m.logged_in==1 and"网易云音乐"or"扫码登录",m)
  if m.logged_in==1 then text(21,89,430,m.login_name or"已登录",2);text(23,139,420,"音乐收藏与歌单已连接",0,C.dim);bar("△刷新  ○账号操作","× 返回")
- else text(22,85,210,"手机扫码登录",1);text(22,124,210,"打开网易云音乐扫一扫",0,C.dim);text(22,148,210,m.qr_state==802 and"已扫码，请在手机确认"or"○ 获取或刷新二维码",0,C.dim);if not ui.qr(277,69,160)then ui.rect(277,69,160,160,C.soft);text(289,131,136,"等待二维码",0,C.dim)end;bar("○生成 / 刷新二维码","× 返回")end
+ else text(22,85,210,"手机扫码登录",1);text(22,124,210,"打开网易云音乐扫一扫",0,C.dim);text(22,148,210,m.qr_state==802 and"已扫码，请在手机确认"or ui.button_hint("○ 获取或刷新二维码"),0,C.dim);if not ui.qr(277,69,160)then ui.rect(277,69,160,160,C.soft);text(289,131,136,"等待二维码",0,C.dim)end;bar("○生成 / 刷新二维码","× 返回")end
 end
 local pages={home=home,mine=mine,settings=settings,player=player,songs=songs,search=search,downloads=downloads,cache=cache,lyrics=lyrics,grid=grid,square=grid,account=account}
 local skin={}

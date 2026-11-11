@@ -3,6 +3,39 @@
 > 每次改代码/发布/文档，**先在下面加一条，再把细节写进 `docs/`**。接手时只读最新一条 + 它链接的文档，不要重读整个 `src/`。
 > 阅读顺序：本页 → [AI-READ-FIRST.md](AI-READ-FIRST.md) → 记录里点名的文件。版本以 [src/app.h](src/app.h) 为准（当前 `4.1.1`）。
 
+## 2026-11-11：ECO配色与MV实机内存日志
+
+- ECO原生调色板刷新仅支持Metro/XMB，导致主题颜色选项只影响Lua首页/播放器，回退页与状态栏仍旧。新增ECO四套完整15色和dark标记，测试明确0→1→2，颜色与明暗都变。
+- H盘log快照`.tmp/hardware-mv-memory-20261111.log`：两次MV gate free13344K/max13312K/need13664K，差320KiB；音频/API/GE/皮肤已释放仍不够，不能仅降低门槛。
+- 定位api.c静态g_thumbs601.5KiB与g_avs121.5KiB为MV不可回收BSS，改为API生命周期高partition缓存，在worker停止后释放，重进API重新建。结果与验证专题另记；真实MV播放仍需装卡重测。
+- 字库新snapshot在MV前释放，并在退出MV后一次恢复；不让新增4.76MB快照挤占解码预算。
+- 三个用户指定入口继续更新，不将模拟器内存充裕等同32MB实机已通过。
+
+## 2026-11-11：实机输入1–2秒卡顿与多音节输入
+
+- 根因：活动词库按记录读盘；重建候选两遍扫描；中文联想顺扫3.2万词；main在同次按键/上屏重复查询。多音节整串不能匹配单音节，所以chuyin/tiaotiao缺单字候选。
+- 修复：校验完成后PSP独立高地址partition保留有界只读快照（不占2MB libc堆），关闭文件；按键读取走内存，无每字读卡。重建单遍，联想前缀缓存，main仅对改变的key/mode/revision查询一次。MV/极致模式释放，回普通后一次恢复，失败不每帧重试。
+- 多音节候选用合法首音节的单字；选择单字只消耗该音节并保留剩余拼音，整词按匹配长度消费。回归包含chuyin先初后音、tiaotiao先跳再保留tiao、整词提交和完整词包大候选窗口。
+- 用户要求未开省电不显示常规模式：只在省电开时显示手动/皮肤标记。
+- host I/O计数和PSP编译证据不等于物理PSP速度；装卡后仍需复测实际输入响应。
+
+## 2026-11-11：极致左右快移与单曲循环实质修复
+
+- 极致列表左右从切分类改成快移8首，□独立切本地/完整缓存；不引入每帧列表I/O。START选项增加列表/单曲循环。
+- 普通END旧代码seek(0)面对已退出decoder无效，且dur未知时不执行；极致旧代码无视play_mode直接下一首。回归分别实测失败后修复。
+- audio_replay_current在stop前检查完整源与MV/fault、复制g_path避免alias，再新gen重开；主循环单曲END重开当前歌曲且只触发一次，失败仅排队当前歌曲；极致保留同索引。
+- 测试：test_audio_repeat、test_repeat_dispatch、test_ultra_player；完整suite结果/构建与装卡manifest分层记录，尚不宣称物理PSP循环连续播放已验证。
+- 用户指定AI-READ-FIRST/README/WORKLOG均同步更新，确认键互换需求保留。
+
+## 2026-11-11：○/×确认键互换（截图Issue #1）
+
+- 新模块input_buttons：默认读取系统按钮分配，手动圆圈/叉确认覆盖并持久保存buttons.cfg；备份原子替换与恢复。
+- 输入采样统一物理到语义映射；privacy gate、首帧held、补采按键、普通页面、弹窗、极致播放器共享同一规则；系统联网Utility仍遵循系统本身设置。
+- 设置新增ID30三态：跟随系统/○确认×取消/×确认○取消；切换当帧重置held/pending避免误触返回。
+- 原生静态提示和官方Lua皮肤说明同步，Lua新增ui.button_hint与物理键名模型；歌曲/查询/歌词不换字符。全局settings性能锁不影响确认键选项（极致独立设置仍只有退出）。
+- 用户指定三份文件已更新：AI-READ-FIRST.md、根README.md、WORKLOG.md；开源README同步说明。
+- tests/test_input_buttons.py先红后绿，覆盖SDK默认/失败回退/持久化/双键/提示和非法值。完整回归与实际构建/装卡证据在本轮manifest，不把host结果当实机。
+
 ## 2026-11-11 实机反馈：极致省电列表反复读卡卡顿
 
 - 用户实机反馈播放列表极卡、读卡灯持续亮，设置页正常。
@@ -452,3 +485,5 @@ flowchart TB
 3. 改运行逻辑同步 [PROJECT-RUNTIME.md](PROJECT-RUNTIME.md)；改阅读路由/新增文件同步 [AI-READ-FIRST.md](AI-READ-FIRST.md)；改能力边界同步对应 `docs/` 专题。
 4. 三层证据分开写：主机回归 / 真实程序在 PPSSPP / 物理 PSP。原始错误没消失前不写「真机已解决」。
 5. `下载\` 里的交付副本只是本机替换用；正式发布仍走 `tools/prxloader/package_versioned_release.py` 与 manifest。
+
+本轮最终验证：完整主机回归148项通过、0失败；额外图片缓存生命周期与真实URL磁盘缓存恢复测试通过，51模块PSP构建成功。已安装H盘备份backup-input-repeat-memory-20261111-142800，PRX SHA256 8e2a0ba3631019e2a1a15196d011e93b4f9446dce88ebdb597ce55c7cd90e2b2。物理PSP输入/MV/循环效果待复测。

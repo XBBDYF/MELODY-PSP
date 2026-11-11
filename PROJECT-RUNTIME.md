@@ -398,13 +398,18 @@ API请求普通歌词／译文，并在可用时解析真实YRC词时间。共�
 
 ### 7.5 模式隔离、独立词库、系统联网（2026-11-11后续）
 
-`power_profile=eco/ultra`显式接管性能设置，不覆盖手动持久配置。极致模式在普通事件/封面/预取/动画之前early分支，仅`ultra_player`本地与完整缓存播放；net最终offline拒绝连接并shutdown在途socket。退出返回普通皮肤恢复手动策略。状态栏标记手动/皮肤省电。
+`power_profile=eco/ultra`显式接管性能设置，不覆盖手动持久配置。极致模式在普通事件/封面/预取/动画之前early分支，仅`ultra_player`本地与完整缓存播放；net最终offline拒绝连接并shutdown在途socket。退出返回普通皮肤恢复手动策略。状态栏仅在开启时标记手动/皮肤省电，普通模式不额外显示。
 
 中文词库包`ime/current.bin`为纯数据，约4.76MB常驻磁盘而不是堆。包验证后由worker准备独立句柄，主线程激活；PSP用sceIo读取、每句柄4080B缓存。候选引用按匹配数分配，s前缀4610项，Lua只收当前四个。热更新发布不可变`pack-*.bin`后原子换`ime/active.txt`指针，旧句柄不动；启动坏指针回current.bin再回内置。更新配置`ime-update.txt`首行HTTP地址，默认COS/melody/ime/current.bin；远端是否已上传需单独验收。
 
 系统WiFi窗口与API连接通过net_dialog_begin/end独占协调；关闭前输入仅系统接收，GU提交完成后绘制系统UI，关闭恢复原渲染后端。WPA2插件是CFW特定兼容扩展，不等同网络普遍稳定性补丁。
 
 外部超频仅桥接控制权，不调用内核PLL或假400MHz SDK频率；已启用外部控制时禁止省电profile并抑制NULL framebuffer黑屏，解除需用户实际停用插件后确认。
+
+### 7.6 物理确认键与语义输入
+
+`input_buttons_init`在privacy/输入前读取SDK按钮偏好和本机覆盖。主循环所有pad采样只在入口translate一次，后续仍以PSP_CTRL_CIRCLE=语义确认、PSP_CTRL_CROSS=语义取消处理；Lua同义，系统netconf不受应用映射。
+静态提示层单次button_hint映射，动态内容不转换。切换当帧清pending并按新映射更新previous mask，避免补采把当前键解释成另一动作。完整接口见根README和主题包。
 
 ## 8. 视频：先让出资源，再加载独立模块
 

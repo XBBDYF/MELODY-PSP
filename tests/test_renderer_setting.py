@@ -50,7 +50,7 @@ int main(void) {
     store_set_renderer(-1); assert(store_renderer() == 0);
     store_set_renderer(2); assert(store_renderer() == 0);
     int seen[MELODY_SETTINGS_COUNT] = {0};
-    assert(MELODY_SETTINGS_COUNT == 30);
+    assert(MELODY_SETTINGS_COUNT == 31);
     for (int row = 0; row < MELODY_SETTINGS_COUNT; ++row) {
         int id = melody_setting_id(row); assert(id >= 0 && id < MELODY_SETTINGS_COUNT);
         assert(!seen[id]++);

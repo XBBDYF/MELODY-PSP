@@ -45,6 +45,9 @@ void ime_backspace(void);
  * prepare/validate/install/close its OWN unactivated ImePack handle. */
 void ime_activate_pack(ImePack *prepared); /* Takes ownership; NULL = builtin fallback. */
 int ime_load_dictionary(const char *app_dir); /* Startup: app_dir/ime/current.bin or fallback. */
+/* Release snapshot and candidate allocation before MV; resume retries saved pack path. */
+void ime_suspend_dictionary(void);
+int ime_resume_dictionary(void);
 unsigned int ime_dictionary_revision(void); /* 0 = builtin. */
 int ime_candidate_total(void);
 int ime_candidate_count(void); /* Compatibility: returns total, including indices >512. */
@@ -53,7 +56,7 @@ int ime_candidate_count(void); /* Compatibility: returns total, including indice
 const char *ime_candidate(int i);
 int ime_candidate_window(int first, char out[][IME_WORD_MAX], int max);
 
-/* 选中第 i 个候选：写入 out，清空 preedit；返回写入字节数，0 表示失败 */
+/* 选中第 i 个候选：写入 out；单字消耗首音节并保留剩余 preedit，整词清空 preedit；返回写入字节数，0 表示失败 */
 int  ime_select(int i, char *out, int cap);
 
 /* 把当前 preedit 原样上屏（假名/英文场景的兜底） */

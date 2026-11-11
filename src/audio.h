@@ -41,6 +41,8 @@ int audio_mv_suspend(void);
 int audio_mv_resume(void);
 
 void audio_stop(void);
+/* Replay the same fully local/downloaded source via fresh decoder generation. */
+int audio_replay_current(const Song *meta);
 void audio_pause(int on);
 int audio_paused(void);
 

@@ -1,3 +1,5 @@
+> 实机延迟修复：本包现以PSP独立高地址partition只读快照查询，加载后关闭磁盘句柄；不再在每次按键扫描卡上记录。MV/极致前释放，回普通后一次恢复。下文早期“常驻磁盘/页缓存”预算以该新实现为准；具体测试见test_ime_performance.py。
+
 # IME 纯数据词库包
 
 本模块是二进制数据包，不是 PRX，也不执行服务器提供的代码。内置词库始终可用；可选词库路径是 `APP_DIR/ime/current.bin`。网络下载与更新设置由调用层负责。
@@ -98,3 +100,10 @@ psp-gcc -std=gnu11 -O2 -Wall -Wextra -Werror -IE:/pspdev/psp/sdk/include -Isrc -
 下载有30秒无数据/10分钟总时限，联网被禁时取消。当前栈HTTP无TLS，CRC防损坏而非身份认证，不能声称有密码学来源签名。
 更新成功发布新名字`ime/pack-<revision>-<time>.bin`，再原子切换`ime/active.txt`，不覆盖正在读的包；旧文件保留可手动清理。坏指针/坏包退`current.bin`再内置。
 本轮仅生成服务器上传材料，未持有远端发布凭据，不能把本地生成写成远端已上传。
+
+## 实机延迟修复后的内存与输入语义
+
+prepare校验后一次读入最多5.24MB只读快照，PSP分区2高地址分配；预留1MB最大块余量，失败回内置且不再边按键边读卡。热更新可能同时保留两份快照（约10MB），准备失败保留旧库。
+MV启动前ime_suspend_dictionary释放快照及候选引用，回普通后ime_resume_dictionary只尝试一次，失败不会逐帧重读。
+单音节仍显示全部已收录字；多音节提供首音节单字：chuyin选初保留yin，tiaotiao选跳保留tiao，整词初音一次上屏。此实现不是完整语言模型或任意句子自动分词。
+性能回归20轮按键/窗口/联想 physical-read delta=0，重复同前缀assoc record delta=0；这是I/O行为证据，不宣称实际PSP毫秒数。

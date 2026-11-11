@@ -12,10 +12,14 @@ enum { IME_PACK_OK=0, IME_PACK_IO=-1, IME_PACK_FORMAT_ERROR=-2,
 enum { IME_PACK_PINYIN=0, IME_PACK_KANA=1, IME_PACK_CHAR=2 };
 typedef struct ImePack ImePack;
 typedef struct { char key[48]; char word[24]; uint32_t freq; uint32_t kind; } ImePackEntry;
-/* Streaming validation: exact size, version, CRC, sorted records, UTF-8 and builtin font. */
+/* Immutable snapshot validation: exact size, version, CRC, sorted records, UTF-8 and builtin font. */
 int ime_pack_prepare(const char *path, ImePack **out);
 int ime_pack_validate(const char *path);
 void ime_pack_close(ImePack *pack);
+const char *ime_pack_path(const ImePack *pack);
+/* Per-handle counters: physical reads and logical record accesses (including validation). */
+unsigned int ime_pack_io_reads(const ImePack *pack);
+unsigned int ime_pack_record_reads(const ImePack *pack);
 unsigned int ime_pack_count(const ImePack *pack, int kind);
 unsigned int ime_pack_revision(const ImePack *pack);
 /* Local index within a kind; does not expose mapped memory or borrowed file buffers. */
